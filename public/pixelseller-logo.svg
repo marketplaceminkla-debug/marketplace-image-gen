@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <!-- background square -->
+  <rect width="160" height="160" rx="28" fill="#1E1040"/>
+
+  <!-- pixel grid rows 1-3 (P letterform) -->
+  <!-- row 1 -->
+  <rect x="18" y="22" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="44" y="22" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="70" y="22" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="96" y="22" width="22" height="22" rx="4" fill="#7C5FF5" opacity="0.5"/>
+  <rect x="122" y="22" width="22" height="22" rx="4" fill="#7C5FF5" opacity="0.25"/>
+  <!-- row 2 -->
+  <rect x="18" y="48" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="44" y="48" width="22" height="22" rx="4" fill="#1E1040"/>
+  <rect x="70" y="48" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="96" y="48" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="122" y="48" width="22" height="22" rx="4" fill="#7C5FF5" opacity="0.5"/>
+  <!-- row 3 -->
+  <rect x="18" y="74" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="44" y="74" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="70" y="74" width="22" height="22" rx="4" fill="#F5C200"/>
+  <rect x="96" y="74" width="22" height="22" rx="4" fill="#1E1040"/>
+  <rect x="122" y="74" width="22" height="22" rx="4" fill="#7C5FF5" opacity="0.5"/>
+
+  <!-- row 4: rising bar chart -->
+  <rect x="18"  y="108" width="22" height="12" rx="3" fill="#A78BFA"/>
+  <rect x="44"  y="102" width="22" height="18" rx="3" fill="#A78BFA"/>
+  <rect x="70"  y="94"  width="22" height="26" rx="3" fill="#F5C200"/>
+  <rect x="96"  y="86"  width="22" height="34" rx="3" fill="#F5C200"/>
+  <rect x="122" y="76"  width="22" height="44" rx="3" fill="#F5C200"/>
+
+  <!-- baseline -->
+  <rect x="14" y="122" width="134" height="3" rx="1.5" fill="#F5C200" opacity="0.3"/>
+</svg>
