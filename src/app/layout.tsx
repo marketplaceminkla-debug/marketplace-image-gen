@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import SplashScreen from "@/components/ui/SplashScreen";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import { AuthProvider } from "@/lib/auth";
 
 // Runs before paint to set the theme class, preventing a light/dark flash.
 const themeInitScript = `(function(){try{var t=localStorage.getItem('ps-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}var r=document.documentElement;if(t==='dark'){r.classList.add('dark');}r.style.colorScheme=t;}catch(e){}})();`;
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontFamily: "Inter, sans-serif" }}>
         <SplashScreen />
         <ThemeToggle />
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

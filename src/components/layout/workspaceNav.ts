@@ -2,13 +2,15 @@ import {
   LayoutDashboard, Gauge, TrendingUp, ListChecks,
   Boxes, PackagePlus, Tag, Percent,
   Wrench, LayoutTemplate, FileSpreadsheet, Zap, PackageOpen,
+  ShieldCheck, Users,
   type LucideIcon,
 } from "lucide-react";
 
 export type ViewId =
   | "dash-overview" | "dash-revenue" | "dash-tal"
   | "prod-new" | "prod-price" | "prod-fee"
-  | "ps-template" | "ps-import" | "ps-generate" | "ps-shopee" | "ps-ziptoshopee";
+  | "ps-template" | "ps-import" | "ps-generate" | "ps-shopee" | "ps-ziptoshopee"
+  | "admin-users";
 
 export interface NavItem {
   id: ViewId;
@@ -35,7 +37,7 @@ export const NAV: NavSection[] = [
     items: [
       { id: "dash-overview", label: "Overview / KPI", shortLabel: "Overview", description: "Ringkasan performa tim", icon: Gauge },
       { id: "dash-revenue", label: "Revenue", shortLabel: "Revenue", description: "Target & progress harian", icon: TrendingUp },
-      { id: "dash-tal", label: "TAL", shortLabel: "TAL", description: "Total Active Listing", icon: ListChecks },
+      { id: "dash-tal", label: "TAL", shortLabel: "TAL", description: "To Achieve List", icon: ListChecks },
     ],
   },
   {
@@ -62,14 +64,16 @@ export const NAV: NavSection[] = [
   },
 ];
 
-export function findSection(view: ViewId): NavSection {
-  return NAV.find((s) => s.items.some((i) => i.id === view)) ?? NAV[0];
-}
+/** Super-admin-only section for managing user accounts and access. */
+export const ADMIN_SECTION: NavSection = {
+  id: "admin",
+  label: "Admin",
+  icon: ShieldCheck,
+  items: [
+    { id: "admin-users", label: "Kelola Akun", shortLabel: "Akun", description: "User & hak akses", icon: Users },
+  ],
+};
 
-export function findItem(view: ViewId): NavItem {
-  for (const s of NAV) {
-    const item = s.items.find((i) => i.id === view);
-    if (item) return item;
-  }
-  return NAV[0].items[0];
+export function findSection(view: ViewId, sections: NavSection[] = NAV): NavSection {
+  return sections.find((s) => s.items.some((i) => i.id === view)) ?? sections[0];
 }

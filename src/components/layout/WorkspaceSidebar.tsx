@@ -1,15 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LayoutGrid, ChevronDown, CheckCircle } from "lucide-react";
-import { NAV, ViewId, findSection } from "@/components/layout/workspaceNav";
+import { LayoutGrid, ChevronDown, CheckCircle, LogOut } from "lucide-react";
+import { ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 interface WorkspaceSidebarProps {
+  sections: NavSection[];
   activeView: ViewId;
   onViewChange: (view: ViewId) => void;
   templateUploaded: boolean;
 }
+
+const ROLE_LABEL: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin: "Admin",
+  staff: "Staff",
+};
 
 function addRipple(e: React.MouseEvent<HTMLButtonElement>) {
   const btn = e.currentTarget;
@@ -24,12 +32,11 @@ function addRipple(e: React.MouseEvent<HTMLButtonElement>) {
   ripple.addEventListener("animationend", () => ripple.remove());
 }
 
-export default function WorkspaceSidebar({ activeView, onViewChange, templateUploaded }: WorkspaceSidebarProps) {
-  const activeSection = findSection(activeView);
+export default function WorkspaceSidebar({ sections, activeView, onViewChange, templateUploaded }: WorkspaceSidebarProps) {
+  const { profile, signOut } = useAuth();
+  const activeSection = findSection(activeView, sections);
   const [openSection, setOpenSection] = useState<string>(activeSection.id);
 
-  // Keep the section containing the active view expanded (e.g. after an import
-  // jumps the user into PixelSeller's Generate step).
   useEffect(() => {
     setOpenSection(activeSection.id);
   }, [activeSection.id]);
@@ -60,13 +67,12 @@ export default function WorkspaceSidebar({ activeView, onViewChange, templateUpl
 
         {/* Accordion nav */}
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3 space-y-1" style={{ position: "relative" }}>
-          {NAV.map((section) => {
+          {sections.map((section) => {
             const SectionIcon = section.icon;
             const isOpen = openSection === section.id;
             const hasActive = section.id === activeSection.id;
             return (
               <div key={section.id}>
-                {/* Section header */}
                 <button
                   onClick={() => setOpenSection(isOpen ? "" : section.id)}
                   className="btn-bounce w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-left transition-colors"
@@ -84,7 +90,6 @@ export default function WorkspaceSidebar({ activeView, onViewChange, templateUpl
                   />
                 </button>
 
-                {/* Section items */}
                 {isOpen && (
                   <div className="mt-0.5 mb-1 space-y-0.5 animate-fade-in">
                     {section.items.map((item, idx) => {
@@ -137,8 +142,25 @@ export default function WorkspaceSidebar({ activeView, onViewChange, templateUpl
           })}
         </nav>
 
-        <div className="px-4 py-3" style={{ borderTop: "1px solid #3D2A7A", position: "relative" }}>
-          <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>Marketplace Workspace · v1.0</p>
+        {/* User footer */}
+        <div className="px-3 py-3 flex items-center gap-2" style={{ borderTop: "1px solid #3D2A7A", position: "relative" }}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style={{ background: "#1E1040", color: "#F5C200" }}>
+            {(profile?.full_name || profile?.email || "?").charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-medium truncate" style={{ color: "rgba(255,255,255,0.85)" }}>{profile?.full_name || profile?.email}</p>
+            <p className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.35)" }}>{ROLE_LABEL[profile?.role ?? "staff"]}</p>
+          </div>
+          <button
+            onClick={signOut}
+            title="Keluar"
+            className="btn-bounce w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ color: "rgba(255,255,255,0.5)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <LogOut size={15} />
+          </button>
         </div>
       </aside>
 
@@ -147,7 +169,7 @@ export default function WorkspaceSidebar({ activeView, onViewChange, templateUpl
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center"
         style={{ background: "#2D1B69", borderTop: "1px solid #3D2A7A", height: "60px" }}
       >
-        {NAV.map((section) => {
+        {sections.map((section) => {
           const Icon = section.icon;
           const isActive = section.id === activeSection.id;
           return (
