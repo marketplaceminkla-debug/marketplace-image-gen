@@ -47,11 +47,12 @@ export default function ThemeToggle() {
       aria-checked={isDark}
       aria-label={isDark ? "Aktifkan light mode" : "Aktifkan dark mode"}
       title={isDark ? "Ganti ke light mode" : "Ganti ke dark mode"}
-      // position:fixed is set inline so the global [data-tip] rule (which forces
-      // position:relative) can never override it. Hidden until mounted to avoid
-      // a flash of the wrong knob position.
-      style={{ position: "fixed", top: "1rem", right: "1.25rem", visibility: mounted ? "visible" : "hidden" }}
-      className="z-[200] flex h-9 w-[68px] items-center rounded-full border border-white/20 bg-kla-purpleDeep/90 px-1 shadow-lg backdrop-blur-sm transition-colors duration-300 hover:border-brand/60 dark:bg-[#221F33]/90"
+      // position:fixed + right are set inline so nothing in the global CSS
+      // cascade can override the placement. Pinned to the bottom-right; the
+      // mobile bottom nav (~60px) is cleared by bottom-[76px], dropping to
+      // bottom-6 on desktop. Hidden until mounted to avoid a knob flash.
+      style={{ position: "fixed", right: "1.25rem", visibility: mounted ? "visible" : "hidden" }}
+      className="bottom-[76px] md:bottom-6 z-[200] flex h-9 w-[68px] items-center rounded-full border border-white/20 bg-kla-purpleDeep/90 px-1 shadow-lg backdrop-blur-sm transition-colors duration-300 hover:border-brand/60 dark:bg-[#221F33]/90"
     >
       {/* Track icons */}
       <Sun
