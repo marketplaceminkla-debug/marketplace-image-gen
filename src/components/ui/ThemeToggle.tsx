@@ -46,10 +46,12 @@ export default function ThemeToggle() {
       role="switch"
       aria-checked={isDark}
       aria-label={isDark ? "Aktifkan light mode" : "Aktifkan dark mode"}
-      data-tip={isDark ? "Light mode" : "Dark mode"}
-      // Hidden until mounted to avoid a flash of the wrong knob position.
-      style={{ visibility: mounted ? "visible" : "hidden" }}
-      className="fixed top-4 right-4 z-[200] flex h-9 w-[68px] items-center rounded-full border border-white/20 bg-kla-purpleDeep/90 px-1 shadow-lg backdrop-blur-sm transition-colors duration-300 hover:border-brand/60 dark:bg-[#221F33]/90"
+      title={isDark ? "Ganti ke light mode" : "Ganti ke dark mode"}
+      // position:fixed is set inline so the global [data-tip] rule (which forces
+      // position:relative) can never override it. Hidden until mounted to avoid
+      // a flash of the wrong knob position.
+      style={{ position: "fixed", top: "1rem", right: "1.25rem", visibility: mounted ? "visible" : "hidden" }}
+      className="z-[200] flex h-9 w-[68px] items-center rounded-full border border-white/20 bg-kla-purpleDeep/90 px-1 shadow-lg backdrop-blur-sm transition-colors duration-300 hover:border-brand/60 dark:bg-[#221F33]/90"
     >
       {/* Track icons */}
       <Sun
