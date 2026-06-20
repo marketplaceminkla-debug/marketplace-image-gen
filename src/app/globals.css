@@ -13,6 +13,63 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════
+   DARK MODE
+   The existing UI hardcodes a slate/white palette across 14 components.
+   Instead of editing every file, we remap those utilities under `.dark`.
+   `.dark .x` outranks the single-class utility, so no !important needed.
+═══════════════════════════════════════════ */
+.dark body { background: #14121F; }
+
+/* Smooth the switch between themes */
+body,
+.bg-white, .bg-main-bg,
+.bg-slate-50, .bg-slate-100, .bg-slate-200,
+.border-slate-100, .border-slate-200, .border-slate-300, .border-main-border,
+.text-slate-300, .text-slate-400, .text-slate-500,
+.text-slate-600, .text-slate-700, .text-slate-800, .text-slate-900 {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Surfaces */
+.dark .bg-main-bg     { background-color: #14121F; }
+.dark .bg-white       { background-color: #221F33; }
+.dark .bg-white\/80   { background-color: rgba(34, 31, 51, 0.8); }
+.dark .bg-white\/20   { background-color: rgba(255, 255, 255, 0.08); }
+.dark .bg-slate-50    { background-color: #1B1828; }
+.dark .bg-slate-100   { background-color: #28243A; }
+.dark .bg-slate-200   { background-color: #322E48; }
+
+/* Borders */
+.dark .border-slate-100  { border-color: #2A2740; }
+.dark .border-slate-200  { border-color: #322E48; }
+.dark .border-slate-300  { border-color: #423D5E; }
+.dark .border-main-border { border-color: #2E2B44; }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2A2740; }
+
+/* Text */
+.dark .text-slate-900 { color: #F2F1F7; }
+.dark .text-slate-800 { color: #E6E4F0; }
+.dark .text-slate-700 { color: #D3D0E2; }
+.dark .text-slate-600 { color: #B7B3CC; }
+.dark .text-slate-500 { color: #9D98B5; }
+.dark .text-slate-400 { color: #807B98; }
+.dark .text-slate-300 { color: #615C7A; }
+
+/* Hover states */
+.dark .hover\:bg-white:hover     { background-color: #2A2740; }
+.dark .hover\:bg-slate-50:hover  { background-color: #28243A; }
+.dark .hover\:bg-slate-100:hover { background-color: #322E48; }
+.dark .hover\:text-slate-600:hover { color: #B7B3CC; }
+.dark .hover\:text-slate-700:hover { color: #D3D0E2; }
+.dark .hover\:text-slate-900:hover { color: #F2F1F7; }
+.dark .hover\:border-slate-300:hover { border-color: #4A4566; }
+
+/* Keep elevated cards readable on the dark page background */
+.dark .shadow-sm, .dark .shadow, .dark .shadow-md, .dark .shadow-lg {
+  --tw-shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+/* ═══════════════════════════════════════════
    SPLASH SCREEN
 ═══════════════════════════════════════════ */
 #ps-splash {
