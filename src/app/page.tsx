@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Loader2, LogOut } from "lucide-react";
 import WorkspaceSidebar from "@/components/layout/WorkspaceSidebar";
-import PlaceholderPage from "@/components/ui/PlaceholderPage";
 import UserManagementPanel from "@/components/layout/UserManagementPanel";
 import TemplatePanel from "@/components/layout/TemplatePanel";
 import GeneratePanel from "@/components/layout/GeneratePanel";
@@ -17,11 +16,11 @@ import RevenuePanel from "@/components/dashboard/RevenuePanel";
 import NewProductPanel from "@/components/products/NewProductPanel";
 import PriceUpdatePanel from "@/components/products/PriceUpdatePanel";
 import FeeDatabasePanel from "@/components/products/FeeDatabasePanel";
+import TalPanel from "@/components/dashboard/TalPanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
-import { ListChecks } from "lucide-react";
 
 export default function Home() {
   const { session, profile, loading, signOut } = useAuth();
@@ -109,18 +108,7 @@ export default function Home() {
       case "dash-revenue":
         return <RevenuePanel />;
       case "dash-tal":
-        return (
-          <PlaceholderPage
-            icon={ListChecks}
-            title="TAL — To Achieve List"
-            subtitle="Daftar target yang harus dicapai tim marketplace."
-            features={[
-              "Daftar target/aksi yang harus diselesaikan tim",
-              "Tandai progress: belum / proses / selesai",
-              "Pantau mana target yang masih ketinggalan",
-            ]}
-          />
-        );
+        return <TalPanel />;
 
       // ── Product Listing ──
       case "prod-new":
