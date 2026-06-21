@@ -14,11 +14,14 @@ import LoginScreen from "@/components/auth/LoginScreen";
 import PendingScreen from "@/components/auth/PendingScreen";
 import OverviewPanel from "@/components/dashboard/OverviewPanel";
 import RevenuePanel from "@/components/dashboard/RevenuePanel";
+import NewProductPanel from "@/components/products/NewProductPanel";
+import PriceUpdatePanel from "@/components/products/PriceUpdatePanel";
+import FeeDatabasePanel from "@/components/products/FeeDatabasePanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
-import { ListChecks, PackagePlus, Tag, Percent } from "lucide-react";
+import { ListChecks } from "lucide-react";
 
 export default function Home() {
   const { session, profile, loading, signOut } = useAuth();
@@ -121,44 +124,11 @@ export default function Home() {
 
       // ── Product Listing ──
       case "prod-new":
-        return (
-          <PlaceholderPage
-            icon={PackagePlus}
-            title="New Product"
-            subtitle="Catat produk baru dan pantau status uploadnya."
-            features={[
-              "Input data produk baru (nama, info, foto)",
-              "Status upload per marketplace: belum / proses / sudah live",
-              "Papan pantau biar ketahuan mana yang masih nyangkut",
-            ]}
-          />
-        );
+        return <NewProductPanel />;
       case "prod-price":
-        return (
-          <PlaceholderPage
-            icon={Tag}
-            title="Update Harga"
-            subtitle="Catat perubahan harga produk lama biar tim selalu update."
-            features={[
-              "Input update harga saat restock / harga naik",
-              "Riwayat perubahan: harga lama → harga baru + tanggal",
-              "Tim internal bisa lihat harga terkini kapan saja",
-            ]}
-          />
-        );
+        return <PriceUpdatePanel />;
       case "prod-fee":
-        return (
-          <PlaceholderPage
-            icon={Percent}
-            title="Database Fee Marketplace"
-            subtitle="Referensi fee tiap marketplace yang bisa di-update."
-            features={[
-              "Daftar fee per marketplace (admin, layanan, dll)",
-              "Bisa diedit kalau kebijakan marketplace berubah",
-              "Dipakai untuk hitung margin produk",
-            ]}
-          />
-        );
+        return <FeeDatabasePanel />;
     }
   }
 
