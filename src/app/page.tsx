@@ -12,11 +12,13 @@ import ShopeeTemplatePanel from "@/components/layout/ShopeeTemplatePanel";
 import ZipToShopeePanel from "@/components/layout/ZipToShopeePanel";
 import LoginScreen from "@/components/auth/LoginScreen";
 import PendingScreen from "@/components/auth/PendingScreen";
+import OverviewPanel from "@/components/dashboard/OverviewPanel";
+import RevenuePanel from "@/components/dashboard/RevenuePanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
-import { Gauge, TrendingUp, ListChecks, PackagePlus, Tag, Percent } from "lucide-react";
+import { ListChecks, PackagePlus, Tag, Percent } from "lucide-react";
 
 export default function Home() {
   const { session, profile, loading, signOut } = useAuth();
@@ -100,32 +102,9 @@ export default function Home() {
 
       // ── Dashboard ──
       case "dash-overview":
-        return (
-          <PlaceholderPage
-            icon={Gauge}
-            title="Overview / KPI"
-            subtitle="Ringkasan performa tim marketplace dalam satu layar."
-            features={[
-              "Kartu KPI: % target revenue tercapai, jumlah produk baru, listing yang belum keupload",
-              "Ringkasan cepat aktivitas tim hari ini",
-              "Shortcut ke modul yang paling sering dipakai",
-            ]}
-          />
-        );
+        return <OverviewPanel onNavigate={handleViewChange} />;
       case "dash-revenue":
-        return (
-          <PlaceholderPage
-            icon={TrendingUp}
-            title="Revenue"
-            subtitle="Pantau pencapaian revenue terhadap target."
-            features={[
-              "Total revenue & target revenue",
-              "Input penambahan revenue tiap hari",
-              "Progress bar otomatis: target udah tercapai berapa persen",
-              "Grafik tren revenue harian/bulanan",
-            ]}
-          />
-        );
+        return <RevenuePanel />;
       case "dash-tal":
         return (
           <PlaceholderPage
