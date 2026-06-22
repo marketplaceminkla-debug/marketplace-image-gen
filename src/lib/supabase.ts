@@ -24,3 +24,6 @@ export const SHOPEE_TEMPLATES_TABLE = "shopee_templates";
 
 // Table name — must match what you create in Supabase DB
 export const TEMPLATES_TABLE = "templates";
+
+// Bucket for warehouse order receipts (resi) — public, optional uploads
+export const WAREHOUSE_RESI_BUCKET = "warehouse-resi";

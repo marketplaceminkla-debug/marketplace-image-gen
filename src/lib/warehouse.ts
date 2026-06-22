@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, WAREHOUSE_RESI_BUCKET } from "./supabase";
 
 export type Ekspedisi = "instan" | "reguler";
 export type Shipment = "dropoff" | "pickup";
@@ -26,6 +26,7 @@ export interface WarehouseOrder {
   ekspedisi: Ekspedisi;
   shipment: Shipment;
   status: OrderStatus;
+  resi_url: string | null;
   created_at: string;
 }
 
@@ -37,21 +38,55 @@ export function normalizeWa(raw: string): string {
   return d;
 }
 
-export function buildWaMessage(o: WarehouseOrder, wh: Warehouse): string {
+/** Detail block for one order (without the greeting/closing). */
+function orderBlock(o: WarehouseOrder, indent = ""): string {
+  const lines = [
+    `Nama Barang: ${o.item_name}`,
+    `Nomor SO: ${o.so_number || "-"}`,
+    `Nomor Pesanan: ${o.order_number || "-"}`,
+    `Keterangan: ${o.keterangan || "-"}`,
+    `Ekspedisi: ${EKSPEDISI_LABEL[o.ekspedisi]}`,
+    `Shipment: ${SHIPMENT_LABEL[o.shipment]}`,
+  ];
+  if (o.resi_url) lines.push(`Resi: ${o.resi_url}`);
+  return lines.map((l) => indent + l).join("\n");
+}
+
+/** Build a WA message for one or many orders to the same warehouse. */
+export function buildWaMessage(orders: WarehouseOrder[], wh: Warehouse): string {
+  if (orders.length === 1) {
+    return (
+      `Halo Gudang ${wh.name}, mohon dibantu cek & proses orderan berikut:\n\n` +
+      orderBlock(orders[0]) +
+      `\n\nTerima kasih.`
+    );
+  }
+  const body = orders
+    .map((o, i) => `${i + 1}.\n${orderBlock(o, "   ")}`)
+    .join("\n\n");
   return (
-    `Halo Gudang ${wh.name}, mohon dibantu cek & proses orderan berikut:\n\n` +
-    `Nama Barang: ${o.item_name}\n` +
-    `Nomor SO: ${o.so_number || "-"}\n` +
-    `Nomor Pesanan: ${o.order_number || "-"}\n` +
-    `Keterangan: ${o.keterangan || "-"}\n` +
-    `Ekspedisi: ${EKSPEDISI_LABEL[o.ekspedisi]}\n` +
-    `Shipment: ${SHIPMENT_LABEL[o.shipment]}\n\n` +
-    `Terima kasih.`
+    `Halo Gudang ${wh.name}, mohon dibantu cek & proses ${orders.length} orderan berikut:\n\n` +
+    body +
+    `\n\nTerima kasih.`
   );
 }
 
-export function waLink(o: WarehouseOrder, wh: Warehouse): string {
-  return `https://wa.me/${normalizeWa(wh.wa_number)}?text=${encodeURIComponent(buildWaMessage(o, wh))}`;
+export function waLink(orders: WarehouseOrder[], wh: Warehouse): string {
+  return `https://wa.me/${normalizeWa(wh.wa_number)}?text=${encodeURIComponent(buildWaMessage(orders, wh))}`;
+}
+
+/** Upload a resi image to storage and return its public URL. */
+export async function uploadResi(file: File): Promise<{ url: string | null; error: string | null }> {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from(WAREHOUSE_RESI_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    upsert: true,
+    contentType: file.type || undefined,
+  });
+  if (error) return { url: null, error: error.message };
+  const { data } = supabase.storage.from(WAREHOUSE_RESI_BUCKET).getPublicUrl(path);
+  return { url: data.publicUrl, error: null };
 }
 
 // ── Warehouses (nomor WA cabang) ──

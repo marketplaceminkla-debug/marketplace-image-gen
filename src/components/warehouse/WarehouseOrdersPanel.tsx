@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send } from "lucide-react";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, FileText, CheckSquare, Square } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
   STATUS_LABEL, EKSPEDISI_LABEL, SHIPMENT_LABEL,
-  listWarehouses, listOrders, addOrder, updateOrder, deleteOrder, waLink,
+  listWarehouses, listOrders, addOrder, updateOrder, deleteOrder, waLink, uploadResi,
 } from "@/lib/warehouse";
 
 const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
@@ -27,6 +27,8 @@ export default function WarehouseOrdersPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   // form
   const [warehouseId, setWarehouseId] = useState("");
@@ -36,6 +38,7 @@ export default function WarehouseOrdersPanel() {
   const [ket, setKet] = useState("");
   const [ekspedisi, setEkspedisi] = useState<Ekspedisi>("reguler");
   const [shipment, setShipment] = useState<Shipment>("pickup");
+  const [resiFile, setResiFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -51,24 +54,48 @@ export default function WarehouseOrdersPanel() {
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
   const shown = useMemo(() => (filter === "all" ? orders : orders.filter((o) => o.status === filter)), [orders, filter]);
 
+  // Group filtered orders by warehouse so each branch gets its own combined send.
+  const groups = useMemo(() => {
+    const m = new Map<string, WarehouseOrder[]>();
+    for (const o of shown) {
+      if (!m.has(o.warehouse_id)) m.set(o.warehouse_id, []);
+      m.get(o.warehouse_id)!.push(o);
+    }
+    return Array.from(m.entries()).map(([wid, ords]) => ({ wh: whMap.get(wid), orders: ords }));
+  }, [shown, whMap]);
+
+  function toggleSelect(id: string) {
+    setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function toggleGroupAll(ords: WarehouseOrder[]) {
+    const allSel = ords.every((o) => selected.has(o.id));
+    setSelected((p) => { const n = new Set(p); ords.forEach((o) => (allSel ? n.delete(o.id) : n.add(o.id))); return n; });
+  }
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!warehouseId) { setError("Pilih gudang tujuan dulu."); return; }
     if (!itemName.trim()) { setError("Isi nama barang dulu."); return; }
     setBusy(true);
     setError(null);
+    let resi_url: string | null = null;
+    if (resiFile) {
+      const up = await uploadResi(resiFile);
+      if (up.error) { setError("Upload resi gagal: " + up.error); setBusy(false); return; }
+      resi_url = up.url;
+    }
     const { error } = await addOrder({
       warehouse_id: warehouseId,
       item_name: itemName.trim(),
       so_number: so.trim() || null,
       order_number: orderNo.trim() || null,
       keterangan: ket.trim() || null,
-      ekspedisi, shipment,
+      ekspedisi, shipment, resi_url,
       created_by: profile?.id ?? null,
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setItemName(""); setSo(""); setOrderNo(""); setKet("");
+    setItemName(""); setSo(""); setOrderNo(""); setKet(""); setResiFile(null);
     load();
   }
 
@@ -78,15 +105,33 @@ export default function WarehouseOrdersPanel() {
     if (error) { setError(error); load(); }
   }
 
-  function sendWa(o: WarehouseOrder) {
-    const wh = whMap.get(o.warehouse_id);
+  // Send one or many orders (same warehouse) as a single WA message.
+  async function send(wh: Warehouse | undefined, ords: WarehouseOrder[]) {
     if (!wh) { setError("Gudang tujuan tidak ditemukan."); return; }
-    window.open(waLink(o, wh), "_blank");
-    if (o.status === "new") setStatus(o, "process");
+    if (!ords.length) { setError("Centang dulu order yang mau dikirim."); return; }
+    window.open(waLink(ords, wh), "_blank");
+    const toProcess = ords.filter((o) => o.status === "new");
+    if (toProcess.length) {
+      const ids = new Set(toProcess.map((o) => o.id));
+      setOrders((rs) => rs.map((r) => (ids.has(r.id) ? { ...r, status: "process" } : r)));
+      await Promise.all(toProcess.map((o) => updateOrder(o.id, { status: "process" })));
+    }
+    setSelected((p) => { const n = new Set(p); ords.forEach((o) => n.delete(o.id)); return n; });
+  }
+
+  async function handleResiUpload(o: WarehouseOrder, file: File) {
+    setUploadingId(o.id);
+    setError(null);
+    const up = await uploadResi(file);
+    if (up.error) { setError("Upload resi gagal: " + up.error); setUploadingId(null); return; }
+    setOrders((rs) => rs.map((r) => (r.id === o.id ? { ...r, resi_url: up.url } : r)));
+    await updateOrder(o.id, { resi_url: up.url });
+    setUploadingId(null);
   }
 
   async function handleDelete(id: string) {
     setOrders((rs) => rs.filter((r) => r.id !== id));
+    setSelected((p) => { const n = new Set(p); n.delete(id); return n; });
     const { error } = await deleteOrder(id);
     if (error) { setError(error); load(); }
   }
@@ -100,7 +145,7 @@ export default function WarehouseOrdersPanel() {
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900">Orderan Gudang</h1>
-            <p className="text-sm text-slate-500 mt-1">Input order, klik Kirim WA ke gudang, lalu pantau statusnya.</p>
+            <p className="text-sm text-slate-500 mt-1">Input order, centang yang mau dikirim, lalu kirim WA gabungan per gudang.</p>
           </div>
         </div>
 
@@ -141,11 +186,16 @@ export default function WarehouseOrdersPanel() {
                     <option value="pickup">Pickup</option>
                   </select>
                 </Labeled>
-                <div className="md:col-span-2">
-                  <Labeled label="Keterangan">
-                    <input value={ket} onChange={(e) => setKet(e.target.value)} placeholder="Keterangan (opsional)" className={INPUT} />
-                  </Labeled>
-                </div>
+                <Labeled label="Keterangan">
+                  <input value={ket} onChange={(e) => setKet(e.target.value)} placeholder="Keterangan (opsional)" className={INPUT} />
+                </Labeled>
+                <Labeled label="Resi (opsional)">
+                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-500 cursor-pointer hover:border-brand">
+                    <Paperclip size={15} className="text-slate-400 shrink-0" />
+                    <span className="truncate">{resiFile ? resiFile.name : "Pilih file resi…"}</span>
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setResiFile(e.target.files?.[0] ?? null)} />
+                  </label>
+                </Labeled>
               </div>
               <button type="submit" disabled={busy} className="btn-bounce mt-3 px-4 py-2 rounded-lg bg-brand hover:bg-brand-hover text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah Order
@@ -164,43 +214,77 @@ export default function WarehouseOrdersPanel() {
               })}
             </div>
 
-            {/* List */}
+            {/* Grouped list */}
             {loading ? (
               <div className="flex items-center gap-2 text-slate-500 text-sm py-10 justify-center">
                 <Loader2 size={16} className="animate-spin" /> Memuat…
               </div>
-            ) : shown.length === 0 ? (
+            ) : groups.length === 0 ? (
               <p className="text-sm text-slate-400 py-10 text-center">Belum ada order di kategori ini.</p>
             ) : (
-              <div className="space-y-2.5">
-                {shown.map((o) => {
-                  const wh = whMap.get(o.warehouse_id);
+              <div className="space-y-5">
+                {groups.map(({ wh, orders: ords }) => {
+                  const selCount = ords.filter((o) => selected.has(o.id)).length;
+                  const allSel = ords.length > 0 && ords.every((o) => selected.has(o.id));
                   return (
-                    <div key={o.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-slate-900 truncate">{o.item_name}</p>
-                            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[o.status]}`}>{STATUS_LABEL[o.status]}</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Gudang: <span className="font-medium text-slate-700">{wh?.name ?? "?"}</span> · SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}
-                          </p>
-                        </div>
-                        <button onClick={() => handleDelete(o.id)} className="text-slate-300 hover:text-danger shrink-0"><Trash2 size={15} /></button>
+                    <div key={wh?.id ?? "unknown"}>
+                      {/* Group header */}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <button onClick={() => toggleGroupAll(ords)} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                          {allSel ? <CheckSquare size={16} className="text-brand-hover" /> : <Square size={16} className="text-slate-400" />}
+                          {wh?.name ?? "Gudang tidak dikenal"}
+                          <span className="text-xs font-normal text-slate-400">({ords.length})</span>
+                        </button>
+                        <button
+                          onClick={() => send(wh, ords.filter((o) => selected.has(o.id)))}
+                          disabled={selCount === 0}
+                          className="btn-bounce inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success text-white text-xs font-semibold hover:opacity-90 disabled:opacity-40"
+                        >
+                          <Send size={13} /> Kirim WA{selCount > 0 ? ` (${selCount})` : ""}
+                        </button>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-                        <button onClick={() => sendWa(o)} className="btn-bounce inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success text-white text-xs font-semibold hover:opacity-90">
-                          <Send size={13} /> Kirim WA
-                        </button>
-                        <span className="text-[11px] text-slate-400">Ubah status:</span>
-                        <select value={o.status} onChange={(e) => setStatus(o, e.target.value as OrderStatus)} className="text-xs rounded-lg border border-slate-200 bg-white text-slate-700 px-2 py-1.5">
-                          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                        </select>
+                      <div className="space-y-2">
+                        {ords.map((o) => {
+                          const checked = selected.has(o.id);
+                          return (
+                            <div key={o.id} className={`bg-white rounded-xl border shadow-sm p-3 ${checked ? "border-brand" : "border-slate-200"}`}>
+                              <div className="flex items-start gap-3">
+                                <button onClick={() => toggleSelect(o.id)} className="mt-0.5 shrink-0">
+                                  {checked ? <CheckSquare size={18} className="text-brand-hover" /> : <Square size={18} className="text-slate-300" />}
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-semibold text-slate-900 truncate">{o.item_name}</p>
+                                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[o.status]}`}>{STATUS_LABEL[o.status]}</span>
+                                    {o.resi_url && (
+                                      <a href={o.resi_url} target="_blank" rel="noreferrer" className="text-[11px] inline-flex items-center gap-1 text-brand-hover hover:underline">
+                                        <FileText size={11} /> Resi
+                                      </a>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-1">SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
+                                  <p className="text-xs text-slate-400 mt-0.5">{EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}</p>
+
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <button onClick={() => send(wh, [o])} className="inline-flex items-center gap-1 text-[11px] font-medium text-success hover:underline">
+                                      <Send size={12} /> Kirim 1 ini
+                                    </button>
+                                    <label className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-brand-hover cursor-pointer">
+                                      {uploadingId === o.id ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+                                      {o.resi_url ? "Ganti resi" : "Upload resi"}
+                                      <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleResiUpload(o, f); }} />
+                                    </label>
+                                    <select value={o.status} onChange={(e) => setStatus(o, e.target.value as OrderStatus)} className="text-[11px] rounded-lg border border-slate-200 bg-white text-slate-700 px-2 py-1">
+                                      {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                                    </select>
+                                  </div>
+                                </div>
+                                <button onClick={() => handleDelete(o.id)} className="text-slate-300 hover:text-danger shrink-0"><Trash2 size={15} /></button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
