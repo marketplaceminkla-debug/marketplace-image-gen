@@ -8,6 +8,7 @@ import { useAuth, type Profile, type Role } from "@/lib/auth";
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard" },
   { id: "product", label: "Product Listing" },
+  { id: "warehouse", label: "Multiwarehouse" },
   { id: "tools", label: "Tools" },
 ];
 

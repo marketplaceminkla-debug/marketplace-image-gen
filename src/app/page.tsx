@@ -17,6 +17,8 @@ import NewProductPanel from "@/components/products/NewProductPanel";
 import PriceUpdatePanel from "@/components/products/PriceUpdatePanel";
 import FeeDatabasePanel from "@/components/products/FeeDatabasePanel";
 import TalPanel from "@/components/dashboard/TalPanel";
+import WarehouseOrdersPanel from "@/components/warehouse/WarehouseOrdersPanel";
+import WarehouseDbPanel from "@/components/warehouse/WarehouseDbPanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
@@ -117,6 +119,12 @@ export default function Home() {
         return <PriceUpdatePanel />;
       case "prod-fee":
         return <FeeDatabasePanel />;
+
+      // ── Multiwarehouse ──
+      case "wh-orders":
+        return <WarehouseOrdersPanel />;
+      case "wh-list":
+        return <WarehouseDbPanel />;
     }
   }
 
