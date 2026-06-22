@@ -40,6 +40,8 @@ export function normalizeWa(raw: string): string {
 
 /** Detail block for one order (without the greeting/closing). */
 function orderBlock(o: WarehouseOrder, indent = ""): string {
+  // Note: resi link is intentionally NOT included in the WA message — only
+  // the order details. The resi stays in the app for download.
   const lines = [
     `Nama Barang: ${o.item_name}`,
     `Nomor SO: ${o.so_number || "-"}`,
@@ -48,7 +50,6 @@ function orderBlock(o: WarehouseOrder, indent = ""): string {
     `Ekspedisi: ${EKSPEDISI_LABEL[o.ekspedisi]}`,
     `Shipment: ${SHIPMENT_LABEL[o.shipment]}`,
   ];
-  if (o.resi_url) lines.push(`Resi: ${o.resi_url}`);
   return lines.map((l) => indent + l).join("\n");
 }
 

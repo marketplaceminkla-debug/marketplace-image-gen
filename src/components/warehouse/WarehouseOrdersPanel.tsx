@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, FileText, CheckSquare, Square } from "lucide-react";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
@@ -127,6 +127,25 @@ export default function WarehouseOrdersPanel() {
     setOrders((rs) => rs.map((r) => (r.id === o.id ? { ...r, resi_url: up.url } : r)));
     await updateOrder(o.id, { resi_url: up.url });
     setUploadingId(null);
+  }
+
+  async function downloadResi(o: WarehouseOrder) {
+    if (!o.resi_url) return;
+    try {
+      const res = await fetch(o.resi_url);
+      const blob = await res.blob();
+      const ext = (o.resi_url.split("?")[0].split(".").pop() || "file").slice(0, 5);
+      const a = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = `resi-${(o.item_name || "order").replace(/[^\w-]+/g, "_")}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(o.resi_url, "_blank"); // fallback if direct download is blocked
+    }
   }
 
   async function handleDelete(id: string) {
@@ -258,9 +277,9 @@ export default function WarehouseOrdersPanel() {
                                     <p className="font-semibold text-slate-900 truncate">{o.item_name}</p>
                                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[o.status]}`}>{STATUS_LABEL[o.status]}</span>
                                     {o.resi_url && (
-                                      <a href={o.resi_url} target="_blank" rel="noreferrer" className="text-[11px] inline-flex items-center gap-1 text-brand-hover hover:underline">
-                                        <FileText size={11} /> Resi
-                                      </a>
+                                      <button onClick={() => downloadResi(o)} className="text-[11px] inline-flex items-center gap-1 text-brand-hover hover:underline">
+                                        <Download size={11} /> Download resi
+                                      </button>
                                     )}
                                   </div>
                                   <p className="text-xs text-slate-500 mt-1">SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
