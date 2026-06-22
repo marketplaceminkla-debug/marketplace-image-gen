@@ -11,6 +11,16 @@ import {
 
 const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
 
+// Nomor SO mask: SO/#####/###### (5 digits then 6 digits)
+const SO_RE = /^SO\/\d{5}\/\d{6}$/;
+function formatSo(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 11);
+  if (!d) return "";
+  let out = "SO/" + d.slice(0, 5);
+  if (d.length > 5) out += "/" + d.slice(5, 11);
+  return out;
+}
+
 const STATUS_STYLE: Record<OrderStatus, string> = {
   new: "bg-slate-100 text-slate-500 border-slate-200",
   process: "bg-warning-light text-warning border-warning/30",
@@ -76,6 +86,7 @@ export default function WarehouseOrdersPanel() {
     e.preventDefault();
     if (!warehouseId) { setError("Pilih gudang tujuan dulu."); return; }
     if (!itemName.trim()) { setError("Isi nama barang dulu."); return; }
+    if (so.trim() && !SO_RE.test(so.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
     setBusy(true);
     setError(null);
     let resi_url: string | null = null;
@@ -188,7 +199,7 @@ export default function WarehouseOrdersPanel() {
                   <input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="Nama barang" className={INPUT} />
                 </Labeled>
                 <Labeled label="Nomor SO">
-                  <input value={so} onChange={(e) => setSo(e.target.value)} placeholder="No SO" className={INPUT} />
+                  <input value={so} onChange={(e) => setSo(formatSo(e.target.value))} placeholder="SO/12345/123456" inputMode="numeric" maxLength={15} className={INPUT} />
                 </Labeled>
                 <Labeled label="Nomor Pesanan">
                   <input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="No Pesanan" className={INPUT} />
