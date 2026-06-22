@@ -2,12 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Building2, Plus, Loader2, Trash2, Pencil, Check, X, Phone } from "lucide-react";
-import { useAuth } from "@/lib/auth";
 import { Warehouse, listWarehouses, addWarehouse, updateWarehouse, deleteWarehouse, normalizeWa } from "@/lib/warehouse";
 
 export default function WarehouseDbPanel() {
-  const { profile } = useAuth();
-  const canEdit = profile?.role === "super_admin" || profile?.role === "admin";
+  // Multiwarehouse: anyone with access to this section can edit (not admin-only).
+  const canEdit = true;
 
   const [rows, setRows] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);

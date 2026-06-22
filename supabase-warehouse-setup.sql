@@ -31,15 +31,15 @@ create table if not exists public.warehouse_orders (
 alter table public.warehouses       enable row level security;
 alter table public.warehouse_orders enable row level security;
 
--- Database gudang (nomor WA): baca = punya akses 'warehouse'; tulis = Admin/Super Admin
+-- Database gudang (nomor WA): baca & tulis = siapa pun yang punya akses 'warehouse'
 drop policy if exists wh_select on public.warehouses;
 create policy wh_select on public.warehouses for select using ( public.has_section('warehouse') );
 drop policy if exists wh_insert on public.warehouses;
-create policy wh_insert on public.warehouses for insert with check ( public.can_edit() );
+create policy wh_insert on public.warehouses for insert with check ( public.has_section('warehouse') );
 drop policy if exists wh_update on public.warehouses;
-create policy wh_update on public.warehouses for update using ( public.can_edit() ) with check ( public.can_edit() );
+create policy wh_update on public.warehouses for update using ( public.has_section('warehouse') ) with check ( public.has_section('warehouse') );
 drop policy if exists wh_delete on public.warehouses;
-create policy wh_delete on public.warehouses for delete using ( public.can_edit() );
+create policy wh_delete on public.warehouses for delete using ( public.has_section('warehouse') );
 
 -- Orderan: baca & tulis = siapa pun yang punya akses 'warehouse' (operasional harian)
 drop policy if exists who_select on public.warehouse_orders;
