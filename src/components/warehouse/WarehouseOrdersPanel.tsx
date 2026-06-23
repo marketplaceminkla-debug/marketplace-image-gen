@@ -26,8 +26,13 @@ const STATUS_STYLE: Record<OrderStatus, string> = {
   process: "bg-warning-light text-warning border-warning/30",
   approved: "bg-success-light text-success border-success/30",
   denied: "bg-danger-light text-danger border-danger/30",
+  done: "bg-success text-white border-success",
 };
-const STATUSES: OrderStatus[] = ["new", "process", "approved", "denied"];
+const STATUSES: OrderStatus[] = ["new", "process", "approved", "denied", "done"];
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function WarehouseOrdersPanel() {
   const { profile } = useAuth();
@@ -37,11 +42,14 @@ export default function WarehouseOrdersPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   // form
   const [warehouseId, setWarehouseId] = useState("");
+  const [orderDate, setOrderDate] = useState(todayISO());
   const [items, setItems] = useState<string[]>([""]);
   const [so, setSo] = useState("");
   const [orderNo, setOrderNo] = useState("");
@@ -62,7 +70,12 @@ export default function WarehouseOrdersPanel() {
   useEffect(() => { load(); }, [load]);
 
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
-  const shown = useMemo(() => (filter === "all" ? orders : orders.filter((o) => o.status === filter)), [orders, filter]);
+  const shown = useMemo(() => orders.filter((o) => {
+    if (filter !== "all" && o.status !== filter) return false;
+    if (fromDate && (o.order_date ?? "") < fromDate) return false;
+    if (toDate && (o.order_date ?? "") > toDate) return false;
+    return true;
+  }), [orders, filter, fromDate, toDate]);
 
   // Group filtered orders by warehouse so each branch gets its own combined send.
   const groups = useMemo(() => {
@@ -102,6 +115,7 @@ export default function WarehouseOrdersPanel() {
     }
     const { error } = await addOrder({
       warehouse_id: warehouseId,
+      order_date: orderDate || todayISO(),
       item_name: cleanItems[0],
       items: cleanItems,
       so_number: so.trim() || null,
@@ -112,7 +126,7 @@ export default function WarehouseOrdersPanel() {
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setItems([""]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null);
+    setItems([""]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO());
     load();
   }
 
@@ -201,6 +215,9 @@ export default function WarehouseOrdersPanel() {
                     {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
                 </Labeled>
+                <Labeled label="Tanggal">
+                  <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className={INPUT} />
+                </Labeled>
                 <div className="md:col-span-2">
                   <label className="text-[11px] text-slate-500">Barang (bisa lebih dari satu)</label>
                   <div className="mt-1 space-y-1.5">
@@ -265,6 +282,17 @@ export default function WarehouseOrdersPanel() {
               })}
             </div>
 
+            {/* Date filter */}
+            <div className="flex items-center gap-2 flex-wrap mb-3 text-xs">
+              <span className="text-slate-500 font-medium">Tanggal:</span>
+              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:border-brand" />
+              <span className="text-slate-400">s/d</span>
+              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:border-brand" />
+              {(fromDate || toDate) && (
+                <button onClick={() => { setFromDate(""); setToDate(""); }} className="text-slate-400 hover:text-danger font-medium">Reset</button>
+              )}
+            </div>
+
             {/* Grouped list */}
             {loading ? (
               <div className="flex items-center gap-2 text-slate-500 text-sm py-10 justify-center">
@@ -317,7 +345,7 @@ export default function WarehouseOrdersPanel() {
                                     )}
                                   </div>
                                   {list.length > 1 && <p className="text-xs text-slate-600 mt-1">Barang: {list.join(", ")}</p>}
-                                  <p className="text-xs text-slate-500 mt-1">SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
+                                  <p className="text-xs text-slate-500 mt-1">{o.order_date ? `${o.order_date} · ` : ""}SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
                                   <p className="text-xs text-slate-400 mt-0.5">{EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}</p>
 
                                   <div className="flex items-center gap-2 mt-2 flex-wrap">

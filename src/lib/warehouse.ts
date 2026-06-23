@@ -2,11 +2,11 @@ import { supabase, WAREHOUSE_RESI_BUCKET } from "./supabase";
 
 export type Ekspedisi = "instan" | "reguler";
 export type Shipment = "dropoff" | "pickup";
-export type OrderStatus = "new" | "process" | "approved" | "denied";
+export type OrderStatus = "new" | "process" | "approved" | "denied" | "done";
 
 export const EKSPEDISI_LABEL: Record<Ekspedisi, string> = { instan: "Instan", reguler: "Reguler" };
 export const SHIPMENT_LABEL: Record<Shipment, string> = { dropoff: "Drop off", pickup: "Pickup" };
-export const STATUS_LABEL: Record<OrderStatus, string> = { new: "New", process: "Process", approved: "Approved", denied: "Denied" };
+export const STATUS_LABEL: Record<OrderStatus, string> = { new: "New", process: "Process", approved: "Approved", denied: "Denied", done: "Done" };
 
 export interface Warehouse {
   id: string;
@@ -19,6 +19,7 @@ export interface Warehouse {
 export interface WarehouseOrder {
   id: string;
   warehouse_id: string;
+  order_date: string; // YYYY-MM-DD
   item_name: string;
   items: string[];
   so_number: string | null;
