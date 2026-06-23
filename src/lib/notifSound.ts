@@ -9,7 +9,7 @@ function getAudio(): HTMLAudioElement | null {
   if (!audio) {
     audio = new Audio("/notif-chirp.wav");
     audio.preload = "auto";
-    audio.volume = 0.9;
+    audio.volume = 1.0;
   }
   return audio;
 }
