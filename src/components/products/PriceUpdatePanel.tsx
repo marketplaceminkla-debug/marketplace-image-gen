@@ -8,7 +8,7 @@ import { PriceUpdate, listPriceUpdates, addPriceUpdate, deletePriceUpdate } from
 
 export default function PriceUpdatePanel() {
   const { profile } = useAuth();
-  const canEdit = profile?.role === "super_admin" || profile?.role === "admin";
+  const canEdit = true; // Product Listing: semua user dengan akses boleh edit
 
   const [rows, setRows] = useState<PriceUpdate[]>([]);
   const [loading, setLoading] = useState(true);

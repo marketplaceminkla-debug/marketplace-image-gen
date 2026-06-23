@@ -9,7 +9,7 @@ const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text
 
 export default function SkuReplacementPanel() {
   const { profile } = useAuth();
-  const canEdit = profile?.role === "super_admin" || profile?.role === "admin";
+  const canEdit = true; // Product Listing: semua user dengan akses boleh edit
 
   const [rows, setRows] = useState<SkuReplacement[]>([]);
   const [loading, setLoading] = useState(true);

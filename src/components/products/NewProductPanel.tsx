@@ -22,7 +22,7 @@ const STATUS_STYLE: Record<MpStatus, string> = {
 
 export default function NewProductPanel() {
   const { profile } = useAuth();
-  const canEdit = profile?.role === "super_admin" || profile?.role === "admin";
+  const canEdit = true; // Product Listing: semua user dengan akses boleh edit
 
   const [rows, setRows] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);

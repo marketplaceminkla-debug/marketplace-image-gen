@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Percent, Plus, Loader2, Trash2, Pencil, Check, X } from "lucide-react";
-import { useAuth } from "@/lib/auth";
 import { formatIDR } from "@/lib/revenue";
 import { Fee, listFees, addFee, updateFee, deleteFee } from "@/lib/products";
 
@@ -13,8 +12,7 @@ function fmtValue(f: Fee): string {
 }
 
 export default function FeeDatabasePanel() {
-  const { profile } = useAuth();
-  const canEdit = profile?.role === "super_admin" || profile?.role === "admin";
+  const canEdit = true; // Product Listing: semua user dengan akses boleh edit
 
   const [rows, setRows] = useState<Fee[]>([]);
   const [loading, setLoading] = useState(true);
