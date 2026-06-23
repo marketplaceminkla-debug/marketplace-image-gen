@@ -23,6 +23,8 @@ import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { Bell } from "lucide-react";
 
 export default function Home() {
   const { session, profile, loading, signOut } = useAuth();
@@ -31,6 +33,8 @@ export default function Home() {
   const [pendingImport, setPendingImport] = useState<ProductImage[] | undefined>(undefined);
   const [panelKey, setPanelKey] = useState(0);
   const prevView = useRef<ViewId>("dash-overview");
+  const [notifs, setNotifs] = useState<{ id: number; text: string }[]>([]);
+  const notifSeq = useRef(0);
 
   useEffect(() => {
     getActiveTemplate().then((t) => setTemplateUploaded(!!t)).catch(() => {});
@@ -65,6 +69,28 @@ export default function Home() {
       setView(first);
     }
   }, [visibleSections, view]);
+
+  // Realtime: notify on new warehouse orders (anywhere in the app) and tell the
+  // orders panel to refresh. Only for users with Multiwarehouse access.
+  const canWarehouse = !!profile && (profile.role === "super_admin" || profile.access.includes("warehouse"));
+  const myId = profile?.id;
+  useEffect(() => {
+    if (!canWarehouse) return;
+    const channel = supabase
+      .channel("wh-orders-rt")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "warehouse_orders" }, (payload) => {
+        const row = payload.new as { created_by?: string; item_name?: string; items?: string[] };
+        window.dispatchEvent(new CustomEvent("wh-orders-changed"));
+        if (row.created_by === myId) return; // don't notify yourself
+        const items = row.items?.length ? row.items : row.item_name ? [row.item_name] : [];
+        const label = items.length ? `${items[0]}${items.length > 1 ? ` +${items.length - 1}` : ""}` : "barang baru";
+        const id = ++notifSeq.current;
+        setNotifs((n) => [...n, { id, text: `Orderan baru: ${label}` }]);
+        setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 8000);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [canWarehouse, myId]);
 
   // ── Auth gates ──
   if (loading) {
@@ -130,6 +156,28 @@ export default function Home() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-main-bg overflow-hidden">
+      {/* Realtime notifications */}
+      {notifs.length > 0 && (
+        <div className="fixed top-4 right-4 z-[300] space-y-2 w-[min(88vw,320px)]">
+          {notifs.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => { handleViewChange("wh-orders"); setNotifs((x) => x.filter((y) => y.id !== n.id)); }}
+              className="animate-slide-up w-full flex items-center gap-2.5 text-left px-3.5 py-3 rounded-xl shadow-lg text-white"
+              style={{ background: "#2D1B69", border: "1px solid #4A2D99" }}
+            >
+              <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "#F5C200" }}>
+                <Bell size={15} className="text-slate-900" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-semibold truncate">{n.text}</span>
+                <span className="block text-[11px] opacity-70">Multiwarehouse · ketuk untuk lihat</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <WorkspaceSidebar sections={visibleSections} activeView={view} onViewChange={handleViewChange} templateUploaded={templateUploaded} />
       <main className="flex-1 flex flex-col overflow-hidden pb-[60px] md:pb-0">
         {/* Mobile sub-nav: items of the active section + logout */}

@@ -75,6 +75,13 @@ export default function WarehouseOrdersPanel() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Live-refresh when a realtime warehouse-order change is broadcast.
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener("wh-orders-changed", handler);
+    return () => window.removeEventListener("wh-orders-changed", handler);
+  }, [load]);
+
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
   const shown = useMemo(() => orders.filter((o) => {
     if (filter !== "all" && o.status !== filter) return false;
