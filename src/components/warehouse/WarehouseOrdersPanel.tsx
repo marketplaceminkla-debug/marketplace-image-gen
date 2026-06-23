@@ -65,22 +65,38 @@ export default function WarehouseOrdersPanel() {
   const [resiFile, setResiFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Silent fetch (no loading spinner) — used for background refreshes.
+  const fetchData = useCallback(async () => {
     const [w, o] = await Promise.all([listWarehouses(), listOrders()]);
     setWarehouses(w);
     setOrders(o);
     setWarehouseId((cur) => cur || (w[0]?.id ?? ""));
-    setLoading(false);
   }, []);
+  const load = useCallback(async () => {
+    setLoading(true);
+    await fetchData();
+    setLoading(false);
+  }, [fetchData]);
   useEffect(() => { load(); }, [load]);
 
-  // Live-refresh when a realtime warehouse-order change is broadcast.
+  // Keep the list fresh without manual refresh: realtime broadcast + light
+  // polling + refetch when the tab regains focus. All silent.
   useEffect(() => {
-    const handler = () => load();
-    window.addEventListener("wh-orders-changed", handler);
-    return () => window.removeEventListener("wh-orders-changed", handler);
-  }, [load]);
+    const refresh = () => fetchData();
+    const onVisible = () => { if (document.visibilityState === "visible") fetchData(); };
+    window.addEventListener("wh-orders-changed", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchData();
+    }, 6000);
+    return () => {
+      window.removeEventListener("wh-orders-changed", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(interval);
+    };
+  }, [fetchData]);
 
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
   const shown = useMemo(() => orders.filter((o) => {
@@ -150,7 +166,7 @@ export default function WarehouseOrdersPanel() {
     setBusy(false);
     if (error) { setError(error); return; }
     setItems([""]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO());
-    load();
+    fetchData();
   }
 
   async function setStatus(o: WarehouseOrder, status: OrderStatus) {
