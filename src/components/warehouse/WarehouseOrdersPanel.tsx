@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square } from "lucide-react";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
-  STATUS_LABEL, EKSPEDISI_LABEL, SHIPMENT_LABEL,
+  STATUS_LABEL, EKSPEDISI_LABEL, SHIPMENT_LABEL, orderItems,
   listWarehouses, listOrders, addOrder, updateOrder, deleteOrder, waLink, uploadResi,
 } from "@/lib/warehouse";
 
@@ -42,7 +42,7 @@ export default function WarehouseOrdersPanel() {
 
   // form
   const [warehouseId, setWarehouseId] = useState("");
-  const [itemName, setItemName] = useState("");
+  const [items, setItems] = useState<string[]>([""]);
   const [so, setSo] = useState("");
   const [orderNo, setOrderNo] = useState("");
   const [ket, setKet] = useState("");
@@ -82,10 +82,15 @@ export default function WarehouseOrdersPanel() {
     setSelected((p) => { const n = new Set(p); ords.forEach((o) => (allSel ? n.delete(o.id) : n.add(o.id))); return n; });
   }
 
+  const updateItem = (i: number, v: string) => setItems((arr) => arr.map((it, idx) => (idx === i ? v : it)));
+  const addItemRow = () => setItems((arr) => [...arr, ""]);
+  const removeItemRow = (i: number) => setItems((arr) => (arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)));
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!warehouseId) { setError("Pilih gudang tujuan dulu."); return; }
-    if (!itemName.trim()) { setError("Isi nama barang dulu."); return; }
+    const cleanItems = items.map((s) => s.trim()).filter(Boolean);
+    if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
     if (so.trim() && !SO_RE.test(so.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
     setBusy(true);
     setError(null);
@@ -97,7 +102,8 @@ export default function WarehouseOrdersPanel() {
     }
     const { error } = await addOrder({
       warehouse_id: warehouseId,
-      item_name: itemName.trim(),
+      item_name: cleanItems[0],
+      items: cleanItems,
       so_number: so.trim() || null,
       order_number: orderNo.trim() || null,
       keterangan: ket.trim() || null,
@@ -106,7 +112,7 @@ export default function WarehouseOrdersPanel() {
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setItemName(""); setSo(""); setOrderNo(""); setKet(""); setResiFile(null);
+    setItems([""]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null);
     load();
   }
 
@@ -195,9 +201,24 @@ export default function WarehouseOrdersPanel() {
                     {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
                 </Labeled>
-                <Labeled label="Nama Barang">
-                  <input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="Nama barang" className={INPUT} />
-                </Labeled>
+                <div className="md:col-span-2">
+                  <label className="text-[11px] text-slate-500">Barang (bisa lebih dari satu)</label>
+                  <div className="mt-1 space-y-1.5">
+                    {items.map((it, i) => (
+                      <div key={i} className="flex gap-1.5">
+                        <input value={it} onChange={(e) => updateItem(i, e.target.value)} placeholder={`Nama barang ${i + 1}`} className={INPUT} />
+                        {items.length > 1 && (
+                          <button type="button" onClick={() => removeItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" onClick={addItemRow} className="inline-flex items-center gap-1 text-xs font-medium text-brand-hover hover:underline">
+                      <Plus size={13} /> Tambah item
+                    </button>
+                  </div>
+                </div>
                 <Labeled label="Nomor SO">
                   <input value={so} onChange={(e) => setSo(formatSo(e.target.value))} placeholder="SO/12345/123456" inputMode="numeric" maxLength={15} className={INPUT} />
                 </Labeled>
@@ -277,6 +298,7 @@ export default function WarehouseOrdersPanel() {
                       <div className="space-y-2">
                         {ords.map((o) => {
                           const checked = selected.has(o.id);
+                          const list = orderItems(o);
                           return (
                             <div key={o.id} className={`bg-white rounded-xl border shadow-sm p-3 ${checked ? "border-brand" : "border-slate-200"}`}>
                               <div className="flex items-start gap-3">
@@ -285,7 +307,8 @@ export default function WarehouseOrdersPanel() {
                                 </button>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="font-semibold text-slate-900 truncate">{o.item_name}</p>
+                                    <p className="font-semibold text-slate-900 truncate">{list.length > 1 ? `${list[0]} +${list.length - 1}` : (list[0] || "-")}</p>
+                                    {list.length > 1 && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-kla-purpleLight text-kla-purple">{list.length} barang</span>}
                                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[o.status]}`}>{STATUS_LABEL[o.status]}</span>
                                     {o.resi_url && (
                                       <button onClick={() => downloadResi(o)} className="text-[11px] inline-flex items-center gap-1 text-brand-hover hover:underline">
@@ -293,6 +316,7 @@ export default function WarehouseOrdersPanel() {
                                       </button>
                                     )}
                                   </div>
+                                  {list.length > 1 && <p className="text-xs text-slate-600 mt-1">Barang: {list.join(", ")}</p>}
                                   <p className="text-xs text-slate-500 mt-1">SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
                                   <p className="text-xs text-slate-400 mt-0.5">{EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}</p>
 

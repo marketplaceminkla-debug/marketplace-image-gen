@@ -20,6 +20,7 @@ export interface WarehouseOrder {
   id: string;
   warehouse_id: string;
   item_name: string;
+  items: string[];
   so_number: string | null;
   order_number: string | null;
   keterangan: string | null;
@@ -28,6 +29,12 @@ export interface WarehouseOrder {
   status: OrderStatus;
   resi_url: string | null;
   created_at: string;
+}
+
+/** Items of an order, falling back to the legacy single item_name field. */
+export function orderItems(o: WarehouseOrder): string[] {
+  if (o.items && o.items.length) return o.items;
+  return o.item_name ? [o.item_name] : [];
 }
 
 /** Normalise an Indonesian WhatsApp number to wa.me form (62xxxxxxxxxx). */
@@ -42,14 +49,19 @@ export function normalizeWa(raw: string): string {
 function orderBlock(o: WarehouseOrder, indent = ""): string {
   // Note: resi link is intentionally NOT included in the WA message — only
   // the order details. The resi stays in the app for download.
-  const lines = [
-    `Nama Barang: ${o.item_name}`,
-    `Nomor SO: ${o.so_number || "-"}`,
-    `Nomor Pesanan: ${o.order_number || "-"}`,
-    `Keterangan: ${o.keterangan || "-"}`,
-    `Ekspedisi: ${EKSPEDISI_LABEL[o.ekspedisi]}`,
-    `Shipment: ${SHIPMENT_LABEL[o.shipment]}`,
-  ];
+  const items = orderItems(o);
+  const lines: string[] = [];
+  if (items.length <= 1) {
+    lines.push(`Nama Barang: ${items[0] || "-"}`);
+  } else {
+    lines.push(`Nama Barang:`);
+    items.forEach((it) => lines.push(`  - ${it}`));
+  }
+  lines.push(`Nomor SO: ${o.so_number || "-"}`);
+  lines.push(`Nomor Pesanan: ${o.order_number || "-"}`);
+  lines.push(`Keterangan: ${o.keterangan || "-"}`);
+  lines.push(`Ekspedisi: ${EKSPEDISI_LABEL[o.ekspedisi]}`);
+  lines.push(`Shipment: ${SHIPMENT_LABEL[o.shipment]}`);
   return lines.map((l) => indent + l).join("\n");
 }
 
