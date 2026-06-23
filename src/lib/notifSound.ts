@@ -1,22 +1,27 @@
-// Tiny synthesized "bird tweet" for new-order notifications.
-// Uses the Web Audio API so no audio asset is needed.
+// New-order notification sound. Uses a real <audio> element (not Web Audio)
+// so it can still play when the tab is in the background — once unlocked by
+// a user gesture.
 
-let ctx: AudioContext | null = null;
+let audio: HTMLAudioElement | null = null;
 
-function getCtx(): AudioContext | null {
+function getAudio(): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
-  if (!ctx) {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return null;
-    ctx = new AC();
+  if (!audio) {
+    audio = new Audio("/notif-chirp.wav");
+    audio.preload = "auto";
+    audio.volume = 0.9;
   }
-  return ctx;
+  return audio;
 }
 
-/** Resume the audio context after a user gesture so playback is allowed later. */
+/** Unlock playback on the first user gesture (play muted once, then reset). */
 export function unlockAudio() {
-  const c = getCtx();
-  if (c && c.state === "suspended") c.resume().catch(() => {});
+  const a = getAudio();
+  if (!a) return;
+  a.muted = true;
+  a.play()
+    .then(() => { a.pause(); a.currentTime = 0; a.muted = false; })
+    .catch(() => { a.muted = false; });
 }
 
 export function isMuted(): boolean {
@@ -28,28 +33,11 @@ export function setMuted(m: boolean) {
   try { localStorage.setItem("ps-notif-muted", m ? "1" : "0"); } catch { /* ignore */ }
 }
 
-/** Play a short two-note bird-like chirp. */
+/** Play the chirp (no-op if muted). */
 export function playChirp() {
   if (isMuted()) return;
-  const c = getCtx();
-  if (!c) return;
-  if (c.state === "suspended") c.resume().catch(() => {});
-
-  const tweet = (start: number, f0: number, f1: number, dur: number) => {
-    const osc = c.createOscillator();
-    const gain = c.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(f0, start);
-    osc.frequency.exponentialRampToValueAtTime(f1, start + dur);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-    osc.connect(gain).connect(c.destination);
-    osc.start(start);
-    osc.stop(start + dur + 0.03);
-  };
-
-  const now = c.currentTime;
-  tweet(now, 1800, 2700, 0.12);        // ciu
-  tweet(now + 0.17, 2100, 2900, 0.12); // ciu
+  const a = getAudio();
+  if (!a) return;
+  try { a.currentTime = 0; } catch { /* ignore */ }
+  a.play().catch(() => {});
 }
