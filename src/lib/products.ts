@@ -32,6 +32,15 @@ export interface Fee {
   note: string | null;
 }
 
+export interface SkuReplacement {
+  id: string;
+  old_sku: string;
+  new_sku: string | null;
+  is_eol: boolean;
+  note: string | null;
+  created_at: string;
+}
+
 // ── Products ──
 export async function listProducts(): Promise<Product[]> {
   const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
@@ -82,5 +91,24 @@ export async function updateFee(id: string, patch: Partial<Fee>) {
 }
 export async function deleteFee(id: string) {
   const { error } = await supabase.from("marketplace_fees").delete().eq("id", id);
+  return { error: error ? error.message : null };
+}
+
+// ── SKU replacements (pengganti / EOL) ──
+export async function listSkuReplacements(): Promise<SkuReplacement[]> {
+  const { data, error } = await supabase.from("sku_replacements").select("*").order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data as SkuReplacement[];
+}
+export async function addSkuReplacement(input: { old_sku: string; new_sku: string | null; is_eol: boolean; note: string | null; created_by: string | null }) {
+  const { error } = await supabase.from("sku_replacements").insert(input);
+  return { error: error ? error.message : null };
+}
+export async function updateSkuReplacement(id: string, patch: Partial<SkuReplacement>) {
+  const { error } = await supabase.from("sku_replacements").update(patch).eq("id", id);
+  return { error: error ? error.message : null };
+}
+export async function deleteSkuReplacement(id: string) {
+  const { error } = await supabase.from("sku_replacements").delete().eq("id", id);
   return { error: error ? error.message : null };
 }

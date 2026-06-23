@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Gauge, TrendingUp, ListChecks,
-  Boxes, PackagePlus, Tag, Percent,
+  Boxes, PackagePlus, Tag, Percent, ArrowLeftRight,
   Warehouse, ClipboardList, Building2,
   Wrench, LayoutTemplate, FileSpreadsheet, Zap, PackageOpen,
   ShieldCheck, Users,
@@ -9,7 +9,7 @@ import {
 
 export type ViewId =
   | "dash-overview" | "dash-revenue" | "dash-tal"
-  | "prod-new" | "prod-price" | "prod-fee"
+  | "prod-new" | "prod-price" | "prod-fee" | "prod-sku"
   | "wh-orders" | "wh-list"
   | "ps-template" | "ps-import" | "ps-generate" | "ps-shopee" | "ps-ziptoshopee"
   | "admin-users";
@@ -50,6 +50,7 @@ export const NAV: NavSection[] = [
       { id: "prod-new", label: "New Product", shortLabel: "New", description: "Input produk + status upload", icon: PackagePlus },
       { id: "prod-price", label: "Update Harga", shortLabel: "Harga", description: "Riwayat perubahan harga", icon: Tag },
       { id: "prod-fee", label: "Database Fee", shortLabel: "Fee", description: "Fee tiap marketplace", icon: Percent },
+      { id: "prod-sku", label: "SKU Pengganti", shortLabel: "SKU", description: "SKU lama → pengganti / EOL", icon: ArrowLeftRight },
     ],
   },
   {

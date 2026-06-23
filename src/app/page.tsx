@@ -16,6 +16,7 @@ import RevenuePanel from "@/components/dashboard/RevenuePanel";
 import NewProductPanel from "@/components/products/NewProductPanel";
 import PriceUpdatePanel from "@/components/products/PriceUpdatePanel";
 import FeeDatabasePanel from "@/components/products/FeeDatabasePanel";
+import SkuReplacementPanel from "@/components/products/SkuReplacementPanel";
 import TalPanel from "@/components/dashboard/TalPanel";
 import WarehouseOrdersPanel from "@/components/warehouse/WarehouseOrdersPanel";
 import WarehouseDbPanel from "@/components/warehouse/WarehouseDbPanel";
@@ -194,6 +195,8 @@ export default function Home() {
         return <PriceUpdatePanel />;
       case "prod-fee":
         return <FeeDatabasePanel />;
+      case "prod-sku":
+        return <SkuReplacementPanel />;
 
       // ── Multiwarehouse ──
       case "wh-orders":
