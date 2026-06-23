@@ -344,20 +344,20 @@ export default function WarehouseOrdersPanel() {
                                       </button>
                                     )}
                                   </div>
-                                  {list.length > 1 && <p className="text-xs text-slate-600 mt-1">Barang: {list.join(", ")}</p>}
-                                  <p className="text-xs text-slate-500 mt-1">{o.order_date ? `${o.order_date} · ` : ""}SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
-                                  <p className="text-xs text-slate-400 mt-0.5">{EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}</p>
+                                  {list.length > 1 && <p className="text-sm text-slate-600 mt-1">Barang: {list.join(", ")}</p>}
+                                  <p className="text-sm text-slate-500 mt-1">{o.order_date ? `${o.order_date} · ` : ""}SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
+                                  <p className="text-sm text-slate-500 mt-0.5">{EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}</p>
 
                                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    <button onClick={() => send(wh, [o])} className="inline-flex items-center gap-1 text-[11px] font-medium text-success hover:underline">
-                                      <Send size={12} /> Kirim 1 ini
+                                    <button onClick={() => send(wh, [o])} className="inline-flex items-center gap-1 text-xs font-medium text-success hover:underline">
+                                      <Send size={13} /> Kirim 1 ini
                                     </button>
-                                    <label className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-brand-hover cursor-pointer">
-                                      {uploadingId === o.id ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+                                    <label className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-brand-hover cursor-pointer">
+                                      {uploadingId === o.id ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
                                       {o.resi_url ? "Ganti resi" : "Upload resi"}
                                       <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleResiUpload(o, f); }} />
                                     </label>
-                                    <select value={o.status} onChange={(e) => setStatus(o, e.target.value as OrderStatus)} className="text-[11px] rounded-lg border border-slate-200 bg-white text-slate-700 px-2 py-1">
+                                    <select value={o.status} onChange={(e) => setStatus(o, e.target.value as OrderStatus)} className="text-xs rounded-lg border border-slate-200 bg-white text-slate-700 px-2 py-1.5">
                                       {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                                     </select>
                                   </div>
