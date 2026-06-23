@@ -24,6 +24,7 @@ import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { listOrders } from "@/lib/warehouse";
 import { unlockAudio, playChirp } from "@/lib/notifSound";
 import { Bell } from "lucide-react";
 
@@ -36,6 +37,8 @@ export default function Home() {
   const prevView = useRef<ViewId>("dash-overview");
   const [notifs, setNotifs] = useState<{ id: number; text: string }[]>([]);
   const notifSeq = useRef(0);
+  const knownOrderIds = useRef<Set<string>>(new Set());
+  const notifBaseline = useRef(false);
 
   useEffect(() => {
     getActiveTemplate().then((t) => setTemplateUploaded(!!t)).catch(() => {});
@@ -86,28 +89,57 @@ export default function Home() {
     }
   }, [visibleSections, view]);
 
-  // Realtime: notify on new warehouse orders (anywhere in the app) and tell the
-  // orders panel to refresh. Only for users with Multiwarehouse access.
+  // New-order notifications (toast + sound), for users with Multiwarehouse
+  // access. Detected by diffing fetched rows against known ids, so it fires
+  // whether the order arrives via realtime or via polling.
   const canWarehouse = !!profile && (profile.role === "super_admin" || profile.access.includes("warehouse"));
   const myId = profile?.id;
+
+  const notifyNewOrders = useCallback((rows: Array<{ id?: string; created_by?: string | null; item_name?: string | null; items?: string[] | null }>) => {
+    for (const row of rows) {
+      if (!row.id || knownOrderIds.current.has(row.id)) continue;
+      knownOrderIds.current.add(row.id);
+      if (!notifBaseline.current) continue;      // skip pre-existing on first load
+      if (row.created_by === myId) continue;      // don't notify yourself
+      const items = row.items?.length ? row.items : row.item_name ? [row.item_name] : [];
+      const label = items.length ? `${items[0]}${items.length > 1 ? ` +${items.length - 1}` : ""}` : "barang baru";
+      const id = ++notifSeq.current;
+      setNotifs((n) => [...n, { id, text: `Orderan baru: ${label}` }]);
+      playChirp();
+      setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 8000);
+    }
+  }, [myId]);
+
   useEffect(() => {
     if (!canWarehouse) return;
+    let active = true;
+
+    // Baseline: record existing orders without notifying.
+    listOrders().then((rows) => {
+      if (!active) return;
+      rows.forEach((r) => knownOrderIds.current.add(r.id));
+      notifBaseline.current = true;
+    });
+
+    // Poll (works in foreground; background gets throttled but realtime covers it).
+    const poll = setInterval(async () => {
+      const rows = await listOrders();
+      if (!active) return;
+      notifyNewOrders(rows);
+      window.dispatchEvent(new CustomEvent("wh-orders-changed"));
+    }, 7000);
+
+    // Realtime: instant updates (incl. background tabs).
     const channel = supabase
       .channel("wh-orders-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "warehouse_orders" }, (payload) => {
-        const row = payload.new as { created_by?: string; item_name?: string; items?: string[] };
         window.dispatchEvent(new CustomEvent("wh-orders-changed"));
-        if (row.created_by === myId) return; // don't notify yourself
-        const items = row.items?.length ? row.items : row.item_name ? [row.item_name] : [];
-        const label = items.length ? `${items[0]}${items.length > 1 ? ` +${items.length - 1}` : ""}` : "barang baru";
-        const id = ++notifSeq.current;
-        setNotifs((n) => [...n, { id, text: `Orderan baru: ${label}` }]);
-        playChirp();
-        setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 8000);
+        notifyNewOrders([payload.new as { id?: string; created_by?: string | null; item_name?: string | null; items?: string[] | null }]);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [canWarehouse, myId]);
+
+    return () => { active = false; clearInterval(poll); supabase.removeChannel(channel); };
+  }, [canWarehouse, notifyNewOrders]);
 
   // ── Auth gates ──
   if (loading) {

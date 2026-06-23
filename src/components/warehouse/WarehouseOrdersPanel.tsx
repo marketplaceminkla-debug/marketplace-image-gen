@@ -79,22 +79,18 @@ export default function WarehouseOrdersPanel() {
   }, [fetchData]);
   useEffect(() => { load(); }, [load]);
 
-  // Keep the list fresh without manual refresh: realtime broadcast + light
-  // polling + refetch when the tab regains focus. All silent.
+  // Keep the list fresh without manual refresh. The workspace broadcasts
+  // "wh-orders-changed" on realtime/poll; also refetch when the tab regains focus.
   useEffect(() => {
     const refresh = () => fetchData();
     const onVisible = () => { if (document.visibilityState === "visible") fetchData(); };
     window.addEventListener("wh-orders-changed", refresh);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", onVisible);
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") fetchData();
-    }, 6000);
     return () => {
       window.removeEventListener("wh-orders-changed", refresh);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(interval);
     };
   }, [fetchData]);
 
