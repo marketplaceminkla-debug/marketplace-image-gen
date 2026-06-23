@@ -30,6 +30,11 @@ const STATUS_STYLE: Record<OrderStatus, string> = {
 };
 const STATUSES: OrderStatus[] = ["new", "process", "approved", "denied", "done"];
 
+const EKSP_STYLE: Record<Ekspedisi, string> = {
+  instan: "bg-warning-light text-warning border-warning/40",
+  reguler: "bg-slate-100 text-slate-500 border-slate-200",
+};
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -42,6 +47,7 @@ export default function WarehouseOrdersPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+  const [ekspFilter, setEkspFilter] = useState<"all" | Ekspedisi>("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -72,19 +78,29 @@ export default function WarehouseOrdersPanel() {
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
   const shown = useMemo(() => orders.filter((o) => {
     if (filter !== "all" && o.status !== filter) return false;
+    if (ekspFilter !== "all" && o.ekspedisi !== ekspFilter) return false;
     if (fromDate && (o.order_date ?? "") < fromDate) return false;
     if (toDate && (o.order_date ?? "") > toDate) return false;
     return true;
-  }), [orders, filter, fromDate, toDate]);
+  }), [orders, filter, ekspFilter, fromDate, toDate]);
 
-  // Group filtered orders by warehouse so each branch gets its own combined send.
+  // Group by warehouse, then split by ekspedisi (Instan first as priority) so
+  // each branch+priority gets its own combined send.
   const groups = useMemo(() => {
-    const m = new Map<string, WarehouseOrder[]>();
+    const m = new Map<string, { instan: WarehouseOrder[]; reguler: WarehouseOrder[] }>();
+    const order: string[] = [];
     for (const o of shown) {
-      if (!m.has(o.warehouse_id)) m.set(o.warehouse_id, []);
-      m.get(o.warehouse_id)!.push(o);
+      if (!m.has(o.warehouse_id)) { m.set(o.warehouse_id, { instan: [], reguler: [] }); order.push(o.warehouse_id); }
+      m.get(o.warehouse_id)![o.ekspedisi].push(o);
     }
-    return Array.from(m.entries()).map(([wid, ords]) => ({ wh: whMap.get(wid), orders: ords }));
+    const out: Array<{ wh?: Warehouse; ekspedisi: Ekspedisi; orders: WarehouseOrder[] }> = [];
+    for (const wid of order) {
+      const g = m.get(wid)!;
+      const wh = whMap.get(wid);
+      if (g.instan.length) out.push({ wh, ekspedisi: "instan", orders: g.instan });
+      if (g.reguler.length) out.push({ wh, ekspedisi: "reguler", orders: g.reguler });
+    }
+    return out;
   }, [shown, whMap]);
 
   function toggleSelect(id: string) {
@@ -282,6 +298,19 @@ export default function WarehouseOrdersPanel() {
               })}
             </div>
 
+            {/* Ekspedisi filter */}
+            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+              {(["all", "instan", "reguler"] as const).map((f) => {
+                const count = f === "all" ? orders.length : orders.filter((o) => o.ekspedisi === f).length;
+                const label = f === "all" ? "Semua ekspedisi" : f === "instan" ? "⚡ Instan" : "Reguler";
+                return (
+                  <button key={f} onClick={() => setEkspFilter(f)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${ekspFilter === f ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
+                    {label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Date filter */}
             <div className="flex items-center gap-2 flex-wrap mb-3 text-xs">
               <span className="text-slate-500 font-medium">Tanggal:</span>
@@ -302,16 +331,19 @@ export default function WarehouseOrdersPanel() {
               <p className="text-sm text-slate-400 py-10 text-center">Belum ada order di kategori ini.</p>
             ) : (
               <div className="space-y-5">
-                {groups.map(({ wh, orders: ords }) => {
+                {groups.map(({ wh, ekspedisi: grpEksp, orders: ords }) => {
                   const selCount = ords.filter((o) => selected.has(o.id)).length;
                   const allSel = ords.length > 0 && ords.every((o) => selected.has(o.id));
                   return (
-                    <div key={wh?.id ?? "unknown"}>
+                    <div key={`${wh?.id ?? "unknown"}-${grpEksp}`}>
                       {/* Group header */}
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <button onClick={() => toggleGroupAll(ords)} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                           {allSel ? <CheckSquare size={16} className="text-brand-hover" /> : <Square size={16} className="text-slate-400" />}
                           {wh?.name ?? "Gudang tidak dikenal"}
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${EKSP_STYLE[grpEksp]}`}>
+                            {grpEksp === "instan" ? "⚡ Instan" : "Reguler"}
+                          </span>
                           <span className="text-xs font-normal text-slate-400">({ords.length})</span>
                         </button>
                         <button
