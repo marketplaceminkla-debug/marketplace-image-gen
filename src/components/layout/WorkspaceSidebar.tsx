@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LayoutGrid, ChevronDown, CheckCircle, LogOut } from "lucide-react";
+import { LayoutGrid, ChevronDown, CheckCircle, LogOut, Volume2, VolumeX } from "lucide-react";
 import { ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
+import { isMuted, setMuted } from "@/lib/notifSound";
 import { cn } from "@/lib/utils";
 
 interface WorkspaceSidebarProps {
@@ -36,6 +37,8 @@ export default function WorkspaceSidebar({ sections, activeView, onViewChange, t
   const { profile, signOut } = useAuth();
   const activeSection = findSection(activeView, sections);
   const [openSection, setOpenSection] = useState<string>(activeSection.id);
+  const [muted, setMutedState] = useState(false);
+  useEffect(() => { setMutedState(isMuted()); }, []);
 
   useEffect(() => {
     setOpenSection(activeSection.id);
@@ -151,6 +154,16 @@ export default function WorkspaceSidebar({ sections, activeView, onViewChange, t
             <p className="text-[12px] font-medium truncate" style={{ color: "rgba(255,255,255,0.85)" }}>{profile?.full_name || profile?.email}</p>
             <p className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.35)" }}>{ROLE_LABEL[profile?.role ?? "staff"]}</p>
           </div>
+          <button
+            onClick={() => { const m = !muted; setMuted(m); setMutedState(m); }}
+            title={muted ? "Suara notif: mati" : "Suara notif: nyala"}
+            className="btn-bounce w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ color: muted ? "rgba(255,255,255,0.3)" : "#F5C200" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          >
+            {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
           <button
             onClick={signOut}
             title="Keluar"

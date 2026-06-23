@@ -24,6 +24,7 @@ import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { unlockAudio, playChirp } from "@/lib/notifSound";
 import { Bell } from "lucide-react";
 
 export default function Home() {
@@ -38,6 +39,21 @@ export default function Home() {
 
   useEffect(() => {
     getActiveTemplate().then((t) => setTemplateUploaded(!!t)).catch(() => {});
+  }, []);
+
+  // Unlock notification audio on the first user gesture (browser autoplay rules).
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
   }, []);
 
   const handleViewChange = useCallback((v: ViewId) => {
@@ -86,6 +102,7 @@ export default function Home() {
         const label = items.length ? `${items[0]}${items.length > 1 ? ` +${items.length - 1}` : ""}` : "barang baru";
         const id = ++notifSeq.current;
         setNotifs((n) => [...n, { id, text: `Orderan baru: ${label}` }]);
+        playChirp();
         setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 8000);
       })
       .subscribe();
