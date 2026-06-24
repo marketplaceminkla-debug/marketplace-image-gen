@@ -284,6 +284,11 @@ export async function buildShopeeExcel(
 
   let sheetXml = await sheetFile.async("string");
 
+  // Shopee locks the Template sheet, which blocks deleting/editing rows.
+  // Strip the protection so the user can clean up the blank gap rows freely.
+  sheetXml = sheetXml.replace(/<sheetProtection\b[^>]*\/>/g, "");
+  sheetXml = sheetXml.replace(/<sheetProtection\b[^>]*>[\s\S]*?<\/sheetProtection>/g, "");
+
   // Leave a safety gap of blank rows between the template instructions and the
   // product data so nothing overlaps. The user simply deletes these blank rows.
   const GAP_ROWS = 5;
