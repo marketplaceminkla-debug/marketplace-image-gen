@@ -2,42 +2,31 @@
  * shopeeExcelExport.ts
  *
  * Fills a copy of the user's Shopee Mass Upload .xlsx template, one row per
- * product, WITHOUT rewriting the whole workbook.
+ * product, WITHOUT rewriting the whole workbook (surgical XML injection into
+ * <sheetData> so Shopee's template metadata stays intact).
  *
- * Why not SheetJS write? The Shopee template carries internal metadata
- * (template fingerprint, named ranges, data validations, hidden sheets) that
- * Shopee validates on upload. Rewriting the workbook with SheetJS drops some
- * of that, causing Shopee to reject the file ("Please download the newest
- * template", status 0/0). Instead we surgically inject <row> XML into the
- * worksheet's <sheetData> inside the .xlsx zip and leave every other byte
- * untouched — the same low-touch approach used to patch the file elsewhere.
- *
- * Column positions (1-based), mapped from the "Template" sheet header row:
- *   B(2)=Nama Produk  C(3)=Deskripsi  Q(17)=Harga  R(18)=Stok
- *   W(23)=Foto Sampul  X(24)..AA(27)=Foto Produk 1-4
- *   AF(32)=Berat  AJ(36)..AM(39)=Jasa Kirim 1-4
+ * Columns are detected at runtime from row 1 of the "Template" sheet, which
+ * holds Shopee's stable machine keys (ps_product_name, ps_item_cover_image,
+ * ps_item_image_N, ps_price, ps_weight, ps_stock.*, ps_maximum/minimum_
+ * purchase_quantity, channel_id.*). This survives column shifts (e.g. adding
+ * a new warehouse/gudang adds ps_stock.* columns and pushes everything right).
  *
  * Photos must be public URLs (Shopee only accepts links) — upload first.
- * Kategori/Harga/Berat have no source data → placeholder defaults; the user
- * MUST review them before uploading to Shopee.
+ * Kategori has no source data → leave blank; user reviews before upload.
  */
 
-const COL = {
-  namaProduk: 2,
-  deskripsi: 3,
-  harga: 17,
-  stok: 18,
-  fotoSampul: 23,
-  fotoProduk1: 24,
-  fotoProduk2: 25,
-  fotoProduk3: 26,
-  fotoProduk4: 27,
-  berat: 32,
-  jasaKirim1: 36,
-  jasaKirim2: 37,
-  jasaKirim3: 38,
-  jasaKirim4: 39,
-};
+interface ColumnMap {
+  namaProduk?: number;
+  deskripsi?: number;
+  maxPurchase?: number;
+  minPurchase?: number;
+  harga?: number;
+  berat?: number;
+  fotoSampul?: number;
+  fotoProduk: number[]; // image 1..4 in order
+  stockCols: number[];  // every ps_stock.* column (one per gudang/cabang)
+  shippingReguler?: number; // channel_id.8003 (Reguler/Cashless)
+}
 
 export interface ShopeeProductRow {
   namaProduk: string;
@@ -48,14 +37,18 @@ export interface ShopeeProductRow {
 
 export interface ShopeeExportDefaults {
   harga: number;
-  stok: number;
   berat: number;
+  stok: number;
+  maxPurchase: number;
+  minPurchase: number;
 }
 
 export const DEFAULT_SHOPEE_PLACEHOLDERS: ShopeeExportDefaults = {
-  harga: 0,
+  harga: 9999999,
+  berat: 3000,
   stok: 1,
-  berat: 100,
+  maxPurchase: 999999,
+  minPurchase: 1,
 };
 
 function colLetter(col1: number): string {
@@ -69,6 +62,12 @@ function colLetter(col1: number): string {
   return s;
 }
 
+function colIndex(letters: string): number {
+  let n = 0;
+  for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n;
+}
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -78,64 +77,96 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
-/** Build a single <c> cell element (inline string or number). */
 function cellXml(col1: number, row1: number, value: string | number): string {
   const ref = `${colLetter(col1)}${row1}`;
   if (typeof value === "number") {
     return `<c r="${ref}"><v>${value}</v></c>`;
   }
-  // inline string keeps us from having to touch sharedStrings.xml
   return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
 }
 
-/** Collect the (column, value) pairs we write for one product, filtered to template width, sorted. */
+/** Detect column positions from row 1 machine keys of the Template sheet. */
+async function detectColumns(buf: ArrayBuffer): Promise<ColumnMap> {
+  const XLSXmod = await import("xlsx");
+  const XLSX = (XLSXmod as unknown as { default?: typeof import("xlsx") }).default ?? XLSXmod;
+  const map: ColumnMap = { fotoProduk: [], stockCols: [] };
+  let wb;
+  try {
+    wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+  } catch {
+    return map;
+  }
+  const sheetName = wb.SheetNames.find((n: string) => n.toLowerCase() === "template") ?? wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  if (!ws || !ws["!ref"]) return map;
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  const imageByIndex: Record<number, number> = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    const cell = ws[addr];
+    if (!cell || cell.v == null) continue;
+    const key = String(cell.v).split("|")[0].trim();
+    const col1 = c + 1;
+    if (key === "ps_product_name") map.namaProduk = col1;
+    else if (key === "ps_product_description") map.deskripsi = col1;
+    else if (key === "ps_maximum_purchase_quantity") map.maxPurchase = col1;
+    else if (key === "ps_minimum_purchase_quantity") map.minPurchase = col1;
+    else if (key === "ps_price") map.harga = col1;
+    else if (key === "ps_weight") map.berat = col1;
+    else if (key === "ps_item_cover_image") map.fotoSampul = col1;
+    else if (key.startsWith("ps_item_image_")) {
+      const n = parseInt(key.slice("ps_item_image_".length), 10);
+      if (n >= 1) imageByIndex[n] = col1;
+    } else if (key.startsWith("ps_stock.")) {
+      map.stockCols.push(col1);
+    } else if (key === "channel_id.8003") {
+      map.shippingReguler = col1;
+    }
+  }
+  for (let n = 1; n <= 4; n++) if (imageByIndex[n]) map.fotoProduk.push(imageByIndex[n]);
+  return map;
+}
+
+/** Collect the (column, value) pairs for one product, filtered to template width, sorted. */
 function collectDataColumns(
   product: ShopeeProductRow,
   defaults: ShopeeExportDefaults,
-  maxCol1: number
+  maxCol1: number,
+  cols: ColumnMap
 ): Array<{ col: number; value: string | number }> {
   const cells: Array<{ col: number; value: string | number }> = [];
-  cells.push({ col: COL.namaProduk, value: product.namaProduk });
-  cells.push({ col: COL.deskripsi, value: product.deskripsi });
-  cells.push({ col: COL.harga, value: defaults.harga });
-  cells.push({ col: COL.stok, value: defaults.stok });
-  cells.push({ col: COL.fotoSampul, value: product.coverUrl });
-
-  const extraCols = [COL.fotoProduk1, COL.fotoProduk2, COL.fotoProduk3, COL.fotoProduk4];
-  extraCols.forEach((c, i) => {
+  if (cols.namaProduk) cells.push({ col: cols.namaProduk, value: product.namaProduk });
+  if (cols.deskripsi) cells.push({ col: cols.deskripsi, value: product.deskripsi });
+  if (cols.maxPurchase) cells.push({ col: cols.maxPurchase, value: defaults.maxPurchase });
+  if (cols.minPurchase) cells.push({ col: cols.minPurchase, value: defaults.minPurchase });
+  if (cols.harga) cells.push({ col: cols.harga, value: defaults.harga });
+  if (cols.berat) cells.push({ col: cols.berat, value: defaults.berat });
+  if (cols.fotoSampul) cells.push({ col: cols.fotoSampul, value: product.coverUrl });
+  cols.fotoProduk.forEach((c, i) => {
     const url = product.extraPhotoUrls[i];
     if (url) cells.push({ col: c, value: url });
   });
-
-  cells.push({ col: COL.berat, value: defaults.berat });
-  [COL.jasaKirim1, COL.jasaKirim2, COL.jasaKirim3, COL.jasaKirim4].forEach((c) => {
-    cells.push({ col: c, value: "Aktif" });
-  });
+  cols.stockCols.forEach((c) => cells.push({ col: c, value: defaults.stok }));
+  if (cols.shippingReguler) cells.push({ col: cols.shippingReguler, value: "Aktif" });
 
   return cells.filter((c) => c.col <= maxCol1).sort((a, b) => a.col - b.col);
 }
 
-/** Build one fresh <row> for a product. */
 function rowXml(
   row1: number,
   product: ShopeeProductRow,
   defaults: ShopeeExportDefaults,
-  maxCol1: number
+  maxCol1: number,
+  cols: ColumnMap
 ): string {
-  const filtered = collectDataColumns(product, defaults, maxCol1);
+  const filtered = collectDataColumns(product, defaults, maxCol1, cols);
   const cellsXml = filtered.map((c) => cellXml(c.col, row1, c.value)).join("");
   return `<row r="${row1}" spans="1:${maxCol1}">${cellsXml}</row>`;
 }
 
-/** Sort the <c> cells inside a row's inner XML by their column index. */
 function sortRowCells(innerXml: string): string {
   const cellRegex = /<c r="([A-Z]+)\d+"(?:[^>]*\/>|[^>]*>[\s\S]*?<\/c>)/g;
   const matches = Array.from(innerXml.matchAll(cellRegex));
-  const colIndex = (letters: string) => {
-    let n = 0;
-    for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
-    return n;
-  };
   const sorted = matches
     .map((m) => ({ xml: m[0], col: colIndex(m[1]) }))
     .sort((a, b) => a.col - b.col)
@@ -144,7 +175,6 @@ function sortRowCells(innerXml: string): string {
   return sorted;
 }
 
-/** Insert row XML right before </sheetData> (handle self-closing <sheetData/> too). */
 function injectRowsBeforeClose(sheetXml: string, rowsXml: string): string {
   if (sheetXml.includes("</sheetData>")) {
     return sheetXml.replace("</sheetData>", `${rowsXml}</sheetData>`);
@@ -155,7 +185,6 @@ function injectRowsBeforeClose(sheetXml: string, rowsXml: string): string {
   throw new Error("Struktur sheet Shopee tidak dikenali (sheetData tidak ditemukan).");
 }
 
-/** Find the worksheet xml path for the sheet named "Template" (fallback: first sheet). */
 function resolveTemplateSheetPath(
   workbookXml: string | undefined,
   relsXml: string | undefined,
@@ -163,7 +192,6 @@ function resolveTemplateSheetPath(
   if (!workbookXml || !relsXml) {
     return "xl/worksheets/sheet1.xml";
   }
-
   const sheetMatches = Array.from(
     workbookXml.matchAll(/<sheet[^>]*\bname="([^"]*)"[^>]*\br:id="([^"]*)"[^>]*\/?>/g)
   );
@@ -188,17 +216,6 @@ function resolveTemplateSheetPath(
   return target;
 }
 
-/**
- * Detect the row where the FIRST product should be written.
- *
- * Shopee templates keep header rows (1..N) where the LAST of those rows is an
- * instruction row whose data-columns are meant to be overwritten by the first
- * product. Verified against a manually-filled, successfully-uploaded file:
- * data started on the last existing (instruction) row, not the row after it.
- *
- * So: first data row = the max existing <row> number (overwrite that row's
- * data columns). If the sheet has no rows at all, fall back to 6.
- */
 function detectFirstDataRow(sheetXml: string): number {
   const rowNums = Array.from(sheetXml.matchAll(/<row[^>]*\br="(\d+)"/g)).map((m) =>
     parseInt(m[1], 10)
@@ -207,15 +224,18 @@ function detectFirstDataRow(sheetXml: string): number {
   return Math.max(...rowNums);
 }
 
-/** Read the template's column count from <dimension ref="A1:XX#"> (fallback 41). */
-function detectMaxCol(sheetXml: string): number {
+function detectMaxCol(sheetXml: string, cols: ColumnMap): number {
+  const needed = Math.max(
+    27,
+    cols.fotoSampul ?? 0,
+    ...cols.fotoProduk,
+    ...cols.stockCols,
+    cols.berat ?? 0,
+    cols.shippingReguler ?? 0,
+  );
   const m = sheetXml.match(/<dimension\s+ref="[A-Z]+\d+:([A-Z]+)\d+"/);
-  if (!m) return 41;
-  const letters = m[1];
-  let n = 0;
-  for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
-  // Ensure we at least cover up to the photo columns we need (AA = 27)
-  return Math.max(n, 27);
+  if (!m) return needed;
+  return Math.max(colIndex(m[1]), needed);
 }
 
 export async function buildShopeeExcel(
@@ -224,6 +244,14 @@ export async function buildShopeeExcel(
   defaults: ShopeeExportDefaults = DEFAULT_SHOPEE_PLACEHOLDERS
 ): Promise<Blob> {
   const JSZip = (await import("jszip")).default;
+
+  const cols = await detectColumns(templateArrayBuffer);
+  if (!cols.fotoSampul || !cols.namaProduk) {
+    throw new Error(
+      "Tidak bisa mengenali kolom di template Shopee (baris kode 'ps_*' tidak ketemu). " +
+        "Pastikan file .xlsx asli dari Shopee Seller Centre dan sheet 'Template' utuh."
+    );
+  }
 
   let zip;
   try {
@@ -246,50 +274,40 @@ export async function buildShopeeExcel(
   let sheetXml = await sheetFile.async("string");
 
   const firstDataRow = detectFirstDataRow(sheetXml);
-  const maxCol = detectMaxCol(sheetXml);
+  const maxCol = detectMaxCol(sheetXml, cols);
 
   if (products.length > 0) {
-    // Product #0 goes onto the existing instruction row (firstDataRow): we
-    // overwrite only the data columns, preserving any other cells already
-    // there (e.g. category/quantity instruction cells Shopee keeps).
     const firstRowRegex = new RegExp(`<row[^>]*\\br="${firstDataRow}"[^>]*>([\\s\\S]*?)</row>`);
     const existing = sheetXml.match(firstRowRegex);
-
-    const dataCols = collectDataColumns(products[0], defaults, maxCol);
+    const dataCols = collectDataColumns(products[0], defaults, maxCol, cols);
 
     if (existing) {
-      // Remove existing cells that occupy our data columns, then add ours, re-sorted.
       let inner = existing[1];
       for (const { col } of dataCols) {
         const ref = `${colLetter(col)}${firstDataRow}`;
-        // remove a <c r="REF" .../> or <c r="REF" ...>...</c>
         inner = inner.replace(
           new RegExp(`<c r="${ref}"(?:[^>]*/>|[^>]*>[\\s\\S]*?</c>)`),
           ""
         );
       }
-      // Append our cells, then sort all cells in the row by column index
       const ourCells = dataCols.map((d) => cellXml(d.col, firstDataRow, d.value)).join("");
       const merged = sortRowCells(inner + ourCells);
       const rebuilt = `<row r="${firstDataRow}" spans="1:${maxCol}">${merged}</row>`;
       sheetXml = sheetXml.replace(firstRowRegex, rebuilt);
     } else {
-      // No existing row — just create it
-      const created = rowXml(firstDataRow, products[0], defaults, maxCol);
+      const created = rowXml(firstDataRow, products[0], defaults, maxCol, cols);
       sheetXml = injectRowsBeforeClose(sheetXml, created);
     }
 
-    // Products #1.. go as brand new rows after firstDataRow
     if (products.length > 1) {
       const extraRows = products
         .slice(1)
-        .map((p, i) => rowXml(firstDataRow + 1 + i, p, defaults, maxCol))
+        .map((p, i) => rowXml(firstDataRow + 1 + i, p, defaults, maxCol, cols))
         .join("");
       sheetXml = injectRowsBeforeClose(sheetXml, extraRows);
     }
   }
 
-  // Update <dimension>. Templates vary: "A1:AO6" (ranged) or bare "A1".
   const lastRow = firstDataRow + products.length - 1;
   if (/<dimension\s+ref="[A-Z]+\d+:[A-Z]+\d+"/.test(sheetXml)) {
     sheetXml = sheetXml.replace(
@@ -300,20 +318,14 @@ export async function buildShopeeExcel(
       }
     );
   } else {
-    // bare dimension like ref="A1" — expand to cover our written area
     sheetXml = sheetXml.replace(
       /<dimension\s+ref="[A-Z]+\d+"/,
       `<dimension ref="A1:${colLetter(maxCol)}${lastRow}"`
     );
   }
 
-  // Rebuild the zip from scratch so we don't introduce directory entries
-  // (JSZip's zip.file()+generateAsync can add "xl/" folder entries that aren't
-  // in the original Shopee file). We copy every original file byte-for-byte,
-  // substituting only the modified worksheet, and create no folder entries.
   const JSZipCtor = (await import("jszip")).default;
   const outZip = new JSZipCtor();
-
   const fileNames = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
   for (const name of fileNames) {
     if (name === sheetPath) {
