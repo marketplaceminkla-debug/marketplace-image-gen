@@ -216,12 +216,23 @@ function resolveTemplateSheetPath(
   return target;
 }
 
+/**
+ * First row where product data should go.
+ *
+ * Shopee 2026 templates ship with header/instruction rows only (no data row),
+ * so data must start on the row AFTER the last instruction row. Older templates
+ * shipped with an empty placeholder data row that was meant to be overwritten.
+ * Tell them apart: if the last existing row is packed with cells (an
+ * instruction row), start on the next row; if it's sparse/empty (a placeholder),
+ * overwrite it.
+ */
 function detectFirstDataRow(sheetXml: string): number {
-  const rowNums = Array.from(sheetXml.matchAll(/<row[^>]*\br="(\d+)"/g)).map((m) =>
-    parseInt(m[1], 10)
-  );
-  if (rowNums.length === 0) return 6;
-  return Math.max(...rowNums);
+  const rowNums = Array.from(sheetXml.matchAll(/<row[^>]*\br="(\d+)"/g)).map((m) => parseInt(m[1], 10));
+  if (rowNums.length === 0) return 7;
+  const maxRow = Math.max(...rowNums);
+  const lastRowMatch = sheetXml.match(new RegExp(`<row[^>]*\\br="${maxRow}"[^>]*>([\\s\\S]*?)</row>`));
+  const cellCount = lastRowMatch ? (lastRowMatch[1].match(/<c\s/g)?.length ?? 0) : 0;
+  return cellCount >= 5 ? maxRow + 1 : maxRow;
 }
 
 function detectMaxCol(sheetXml: string, cols: ColumnMap): number {
