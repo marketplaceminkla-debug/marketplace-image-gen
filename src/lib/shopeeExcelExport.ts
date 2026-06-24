@@ -284,7 +284,10 @@ export async function buildShopeeExcel(
 
   let sheetXml = await sheetFile.async("string");
 
-  const firstDataRow = detectFirstDataRow(sheetXml);
+  // Leave a safety gap of blank rows between the template instructions and the
+  // product data so nothing overlaps. The user simply deletes these blank rows.
+  const GAP_ROWS = 5;
+  const firstDataRow = detectFirstDataRow(sheetXml) + GAP_ROWS;
   const maxCol = detectMaxCol(sheetXml, cols);
 
   if (products.length > 0) {
