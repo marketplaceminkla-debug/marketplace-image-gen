@@ -25,7 +25,7 @@ interface ColumnMap {
   fotoSampul?: number;
   fotoProduk: number[]; // image 1..4 in order
   stockCols: number[];  // every ps_stock.* column (one per gudang/cabang)
-  shippingReguler?: number; // channel_id.8003 (Reguler/Cashless)
+  shippingCols: number[]; // every channel_id.* column (jasa kirim)
 }
 
 export interface ShopeeProductRow {
@@ -89,7 +89,7 @@ function cellXml(col1: number, row1: number, value: string | number): string {
 async function detectColumns(buf: ArrayBuffer): Promise<ColumnMap> {
   const XLSXmod = await import("xlsx");
   const XLSX = (XLSXmod as unknown as { default?: typeof import("xlsx") }).default ?? XLSXmod;
-  const map: ColumnMap = { fotoProduk: [], stockCols: [] };
+  const map: ColumnMap = { fotoProduk: [], stockCols: [], shippingCols: [] };
   let wb;
   try {
     wb = XLSX.read(new Uint8Array(buf), { type: "array" });
@@ -119,8 +119,8 @@ async function detectColumns(buf: ArrayBuffer): Promise<ColumnMap> {
       if (n >= 1) imageByIndex[n] = col1;
     } else if (key.startsWith("ps_stock.")) {
       map.stockCols.push(col1);
-    } else if (key === "channel_id.8003") {
-      map.shippingReguler = col1;
+    } else if (key.startsWith("channel_id.")) {
+      map.shippingCols.push(col1);
     }
   }
   for (let n = 1; n <= 4; n++) if (imageByIndex[n]) map.fotoProduk.push(imageByIndex[n]);
@@ -147,7 +147,7 @@ function collectDataColumns(
     if (url) cells.push({ col: c, value: url });
   });
   cols.stockCols.forEach((c) => cells.push({ col: c, value: defaults.stok }));
-  if (cols.shippingReguler) cells.push({ col: cols.shippingReguler, value: "Aktif" });
+  cols.shippingCols.forEach((c) => cells.push({ col: c, value: "Aktif" }));
 
   return cells.filter((c) => c.col <= maxCol1).sort((a, b) => a.col - b.col);
 }
@@ -230,8 +230,8 @@ function detectMaxCol(sheetXml: string, cols: ColumnMap): number {
     cols.fotoSampul ?? 0,
     ...cols.fotoProduk,
     ...cols.stockCols,
+    ...cols.shippingCols,
     cols.berat ?? 0,
-    cols.shippingReguler ?? 0,
   );
   const m = sheetXml.match(/<dimension\s+ref="[A-Z]+\d+:([A-Z]+)\d+"/);
   if (!m) return needed;
