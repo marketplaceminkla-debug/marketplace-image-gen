@@ -48,6 +48,13 @@ function numbersToDisplay(nums: number[]): string {
   return parts.join(",");
 }
 
+/** Cover photos = the 1st photo of each 5-photo product group: 1,6,11,… */
+function coverNumbers(total: number): number[] {
+  const a: number[] = [];
+  for (let i = 1; i <= total; i += 5) a.push(i);
+  return a;
+}
+
 export default function TemplateAssignmentPanel({
   totalImages,
   rules,
@@ -174,6 +181,15 @@ export default function TemplateAssignmentPanel({
                   disabled={disabled}
                   className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-purple-400"
                 />
+                <button
+                  type="button"
+                  onClick={() => updateRulePhotos(rule.id, coverNumbers(totalImages).join(","))}
+                  disabled={disabled}
+                  className="text-[10px] font-medium text-purple-600 hover:underline mt-1 inline-flex items-center gap-1 disabled:text-slate-300 disabled:no-underline"
+                  title="Isi otomatis dengan urutan foto sampul tiap produk"
+                >
+                  ✨ Rekomendasi foto sampul (1,6,11,… · {coverNumbers(totalImages).length} foto)
+                </button>
                 {rule.photoNumbers.length > 0 && (
                   <p className="text-[10px] text-slate-400 mt-1">{rule.photoNumbers.length} foto ter-assign</p>
                 )}
