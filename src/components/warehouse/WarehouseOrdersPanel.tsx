@@ -56,7 +56,7 @@ export default function WarehouseOrdersPanel() {
   // form
   const [warehouseId, setWarehouseId] = useState("");
   const [orderDate, setOrderDate] = useState(todayISO());
-  const [items, setItems] = useState<string[]>([""]);
+  const [items, setItems] = useState<{ name: string; qty: number }[]>([{ name: "", qty: 1 }]);
   const [so, setSo] = useState("");
   const [orderNo, setOrderNo] = useState("");
   const [ket, setKet] = useState("");
@@ -130,14 +130,15 @@ export default function WarehouseOrdersPanel() {
     setSelected((p) => { const n = new Set(p); ords.forEach((o) => (allSel ? n.delete(o.id) : n.add(o.id))); return n; });
   }
 
-  const updateItem = (i: number, v: string) => setItems((arr) => arr.map((it, idx) => (idx === i ? v : it)));
-  const addItemRow = () => setItems((arr) => [...arr, ""]);
+  const updateItemName = (i: number, v: string) => setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, name: v } : it)));
+  const updateItemQty = (i: number, v: number) => setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, qty: v } : it)));
+  const addItemRow = () => setItems((arr) => [...arr, { name: "", qty: 1 }]);
   const removeItemRow = (i: number) => setItems((arr) => (arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)));
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!warehouseId) { setError("Pilih gudang tujuan dulu."); return; }
-    const cleanItems = items.map((s) => s.trim()).filter(Boolean);
+    const cleanItems = items.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
     if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
     if (so.trim() && !SO_RE.test(so.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
     setBusy(true);
@@ -151,8 +152,9 @@ export default function WarehouseOrdersPanel() {
     const { error } = await addOrder({
       warehouse_id: warehouseId,
       order_date: orderDate || todayISO(),
-      item_name: cleanItems[0],
-      items: cleanItems,
+      item_name: cleanItems[0].name,
+      items: cleanItems.map((it) => it.name),
+      item_qtys: cleanItems.map((it) => it.qty),
       so_number: so.trim() || null,
       order_number: orderNo.trim() || null,
       keterangan: ket.trim() || null,
@@ -161,7 +163,7 @@ export default function WarehouseOrdersPanel() {
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setItems([""]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO());
+    setItems([{ name: "", qty: 1 }]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO());
     fetchData();
   }
 
@@ -254,11 +256,19 @@ export default function WarehouseOrdersPanel() {
                   <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className={INPUT} />
                 </Labeled>
                 <div className="md:col-span-2">
-                  <label className="text-[11px] text-slate-500">Barang (bisa lebih dari satu)</label>
+                  <label className="text-[11px] text-slate-500">Barang &amp; jumlah (bisa lebih dari satu)</label>
                   <div className="mt-1 space-y-1.5">
                     {items.map((it, i) => (
                       <div key={i} className="flex gap-1.5">
-                        <input value={it} onChange={(e) => updateItem(i, e.target.value)} placeholder={`Nama barang ${i + 1}`} className={INPUT} />
+                        <input value={it.name} onChange={(e) => updateItemName(i, e.target.value)} placeholder={`Nama barang ${i + 1}`} className={INPUT} />
+                        <input
+                          type="number"
+                          min={1}
+                          value={it.qty}
+                          onChange={(e) => updateItemQty(i, Number(e.target.value))}
+                          title="Jumlah (qty)"
+                          className="shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                        />
                         {items.length > 1 && (
                           <button type="button" onClick={() => removeItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
                             <X size={15} />
@@ -386,7 +396,7 @@ export default function WarehouseOrdersPanel() {
                                 </button>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="font-semibold text-slate-900 truncate">{list.length > 1 ? `${list[0]} +${list.length - 1}` : (list[0] || "-")}</p>
+                                    <p className="font-semibold text-slate-900 truncate">{list.length === 0 ? "-" : list.length > 1 ? `${list[0].name} +${list.length - 1}` : `${list[0].name}${list[0].qty > 1 ? ` ×${list[0].qty}` : ""}`}</p>
                                     {list.length > 1 && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-kla-purpleLight text-kla-purple">{list.length} barang</span>}
                                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[o.status]}`}>{STATUS_LABEL[o.status]}</span>
                                     {o.resi_url && (
@@ -395,7 +405,7 @@ export default function WarehouseOrdersPanel() {
                                       </button>
                                     )}
                                   </div>
-                                  {list.length > 1 && <p className="text-sm text-slate-600 mt-1">Barang: {list.join(", ")}</p>}
+                                  {list.length > 1 && <p className="text-sm text-slate-600 mt-1">Barang: {list.map((it) => `${it.name}${it.qty > 1 ? ` ×${it.qty}` : ""}`).join(", ")}</p>}
                                   <p className="text-sm text-slate-500 mt-1">{o.order_date ? `${o.order_date} · ` : ""}SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
                                   <p className="text-sm text-slate-500 mt-0.5">{EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}</p>
 

@@ -22,6 +22,7 @@ export interface WarehouseOrder {
   order_date: string; // YYYY-MM-DD
   item_name: string;
   items: string[];
+  item_qtys: number[];
   so_number: string | null;
   order_number: string | null;
   keterangan: string | null;
@@ -32,10 +33,13 @@ export interface WarehouseOrder {
   created_at: string;
 }
 
-/** Items of an order, falling back to the legacy single item_name field. */
-export function orderItems(o: WarehouseOrder): string[] {
-  if (o.items && o.items.length) return o.items;
-  return o.item_name ? [o.item_name] : [];
+export interface OrderItem { name: string; qty: number; }
+
+/** Items of an order (name + qty), falling back to the legacy single item_name. */
+export function orderItems(o: WarehouseOrder): OrderItem[] {
+  const names = o.items && o.items.length ? o.items : o.item_name ? [o.item_name] : [];
+  const qtys = o.item_qtys ?? [];
+  return names.map((name, i) => ({ name, qty: qtys[i] ?? 1 }));
 }
 
 /** Normalise an Indonesian WhatsApp number to wa.me form (62xxxxxxxxxx). */
@@ -53,10 +57,10 @@ function orderBlock(o: WarehouseOrder, indent = ""): string {
   const items = orderItems(o);
   const lines: string[] = [];
   if (items.length <= 1) {
-    lines.push(`Nama Barang: ${items[0] || "-"}`);
+    lines.push(`Nama Barang: ${items[0] ? `${items[0].name} (${items[0].qty} pcs)` : "-"}`);
   } else {
     lines.push(`Nama Barang:`);
-    items.forEach((it) => lines.push(`  - ${it}`));
+    items.forEach((it) => lines.push(`  - ${it.name} (${it.qty} pcs)`));
   }
   lines.push(`Nomor SO: ${o.so_number || "-"}`);
   lines.push(`Nomor Pesanan: ${o.order_number || "-"}`);
