@@ -78,8 +78,14 @@ create table if not exists public.report_pending_items (
 );
 
 -- 6. Tambah kolom store_account_id ke warehouse_orders
-alter table public.warehouse_orders
-  add column if not exists store_account_id uuid references public.store_accounts(id);
+-- (jalankan ini hanya jika tabel warehouse_orders sudah ada)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'warehouse_orders') then
+    alter table public.warehouse_orders
+      add column if not exists store_account_id uuid references public.store_accounts(id);
+  end if;
+end $$;
 
 -- ── RLS ──
 alter table public.store_accounts       enable row level security;
