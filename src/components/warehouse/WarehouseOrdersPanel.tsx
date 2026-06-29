@@ -8,6 +8,7 @@ import {
   STATUS_LABEL, EKSPEDISI_LABEL, SHIPMENT_LABEL, orderItems,
   listWarehouses, listOrders, addOrder, updateOrder, deleteOrder, waLink, uploadResi,
 } from "@/lib/warehouse";
+import { StoreAccount, listStoreAccounts, storeDisplayName } from "@/lib/reporting";
 
 const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
 
@@ -42,6 +43,7 @@ function todayISO() {
 export default function WarehouseOrdersPanel() {
   const { profile } = useAuth();
 
+  const [storeAccounts, setStoreAccounts] = useState<StoreAccount[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [orders, setOrders] = useState<WarehouseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,7 @@ export default function WarehouseOrdersPanel() {
   const [ekspedisi, setEkspedisi] = useState<Ekspedisi>("reguler");
   const [shipment, setShipment] = useState<Shipment>("pickup");
   const [resiFile, setResiFile] = useState<File | null>(null);
+  const [storeAccountId, setStoreAccountId] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
   // Silent fetch (no loading spinner) — used for background refreshes.
@@ -78,6 +81,7 @@ export default function WarehouseOrdersPanel() {
     setLoading(false);
   }, [fetchData]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { listStoreAccounts().then(setStoreAccounts); }, []);
 
   // Keep the list fresh without manual refresh. The workspace broadcasts
   // "wh-orders-changed" on realtime/poll; also refetch when the tab regains focus.
@@ -159,11 +163,12 @@ export default function WarehouseOrdersPanel() {
       order_number: orderNo.trim() || null,
       keterangan: ket.trim() || null,
       ekspedisi, shipment, resi_url,
+      store_account_id: storeAccountId || null,
       created_by: profile?.id ?? null,
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setItems([{ name: "", qty: 1 }]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO());
+    setItems([{ name: "", qty: 1 }]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO()); setStoreAccountId("");
     fetchData();
   }
 
@@ -301,6 +306,14 @@ export default function WarehouseOrdersPanel() {
                 </Labeled>
                 <Labeled label="Keterangan">
                   <input value={ket} onChange={(e) => setKet(e.target.value)} placeholder="Keterangan (opsional)" className={INPUT} />
+                </Labeled>
+                <Labeled label="Platform / Toko (untuk Report Harian)">
+                  <select value={storeAccountId} onChange={(e) => setStoreAccountId(e.target.value)} className={INPUT}>
+                    <option value="">— Pilih toko (opsional) —</option>
+                    {storeAccounts.map((s) => (
+                      <option key={s.id} value={s.id}>{storeDisplayName(s)}</option>
+                    ))}
+                  </select>
                 </Labeled>
                 <Labeled label="Resi (opsional)">
                   <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-500 cursor-pointer hover:border-brand">

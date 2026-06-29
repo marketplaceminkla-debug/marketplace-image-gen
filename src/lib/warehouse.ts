@@ -30,6 +30,7 @@ export interface WarehouseOrder {
   shipment: Shipment;
   status: OrderStatus;
   resi_url: string | null;
+  store_account_id: string | null;
   created_at: string;
 }
 
@@ -132,6 +133,19 @@ export async function listOrders(): Promise<WarehouseOrder[]> {
   if (error || !data) return [];
   return data as WarehouseOrder[];
 }
+/** Orders filtered by store account and date — used by Report Harian to sync deals. */
+export async function listOrdersByStore(storeAccountId: string, date: string): Promise<WarehouseOrder[]> {
+  const { data, error } = await supabase
+    .from("warehouse_orders")
+    .select("*")
+    .eq("store_account_id", storeAccountId)
+    .eq("order_date", date)
+    .neq("status", "denied")
+    .order("created_at");
+  if (error || !data) return [];
+  return data as WarehouseOrder[];
+}
+
 export async function addOrder(input: Omit<WarehouseOrder, "id" | "status" | "created_at"> & { created_by: string | null }) {
   const { error } = await supabase.from("warehouse_orders").insert(input);
   return { error: error ? error.message : null };

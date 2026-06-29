@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gauge, TrendingUp, Target, Percent, Loader2, type LucideIcon } from "lucide-react";
+import { Gauge, TrendingUp, Target, Percent, Loader2, AlertCircle, CheckCircle2, type LucideIcon } from "lucide-react";
 import { getTarget, listEntries, formatIDR } from "@/lib/revenue";
+import { listOpenPendingItems, listStoreAccounts, type PendingItem, type StoreAccount } from "@/lib/reporting";
 import type { ViewId } from "@/components/layout/workspaceNav";
 
 export default function OverviewPanel({ onNavigate }: { onNavigate: (v: ViewId) => void }) {
@@ -10,14 +11,18 @@ export default function OverviewPanel({ onNavigate }: { onNavigate: (v: ViewId) 
   const [total, setTotal] = useState(0);
   const [target, setTarget] = useState(0);
   const [count, setCount] = useState(0);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  const [storeMap, setStoreMap] = useState<Map<string, StoreAccount>>(new Map());
 
   useEffect(() => {
     let active = true;
-    Promise.all([getTarget(), listEntries()]).then(([t, entries]) => {
+    Promise.all([getTarget(), listEntries(), listOpenPendingItems(), listStoreAccounts()]).then(([t, entries, pending, stores]) => {
       if (!active) return;
       setTarget(t);
       setTotal(entries.reduce((s, e) => s + e.amount, 0));
       setCount(entries.length);
+      setPendingItems(pending);
+      setStoreMap(new Map(stores.map((s) => [s.id, s])));
       setLoading(false);
     }).catch(() => active && setLoading(false));
     return () => { active = false; };
@@ -66,9 +71,39 @@ export default function OverviewPanel({ onNavigate }: { onNavigate: (v: ViewId) 
               <p className="text-[11px] text-slate-400 mt-2">Klik buat buka & input revenue →</p>
             </button>
 
-            <p className="text-xs text-slate-400 mt-5">
-              KPI produk (produk baru, listing pending) bakal muncul di sini setelah modul Product Listing dibangun. 🚧
-            </p>
+            {/* Pending Followup Widget */}
+            {pendingItems.length > 0 && (
+              <div className="mt-5 bg-warning-light border border-warning/30 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle size={16} className="text-warning shrink-0" />
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    Perlu Followup — {pendingItems.length} pending
+                  </h3>
+                  <button
+                    onClick={() => onNavigate("dash-report")}
+                    className="ml-auto text-[11px] text-brand-hover hover:underline font-medium"
+                  >
+                    Kelola →
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {pendingItems.slice(0, 8).map((p) => {
+                    const store = storeMap.get(p.store_account_id);
+                    return (
+                      <div key={p.id} className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 size={13} className="text-warning shrink-0" />
+                        <span className="flex-1 text-slate-700">{p.product_name}</span>
+                        {store && <span className="text-[10px] text-slate-400 shrink-0">{store.pic_name}</span>}
+                        <span className="text-[10px] text-slate-400 shrink-0">{p.report_date}</span>
+                      </div>
+                    );
+                  })}
+                  {pendingItems.length > 8 && (
+                    <p className="text-[11px] text-slate-400 pl-5">+{pendingItems.length - 8} lainnya…</p>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
