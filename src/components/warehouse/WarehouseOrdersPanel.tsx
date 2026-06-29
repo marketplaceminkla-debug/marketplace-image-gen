@@ -66,6 +66,8 @@ export default function WarehouseOrdersPanel() {
   const [shipment, setShipment] = useState<Shipment>("pickup");
   const [resiFile, setResiFile] = useState<File | null>(null);
   const [storeAccountId, setStoreAccountId] = useState<string>("");
+  const [revenue, setRevenue] = useState<string>("");
+  const [komboHemat, setKomboHemat] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
   // Silent fetch (no loading spinner) — used for background refreshes.
@@ -164,11 +166,13 @@ export default function WarehouseOrdersPanel() {
       keterangan: ket.trim() || null,
       ekspedisi, shipment, resi_url,
       store_account_id: storeAccountId || null,
+      revenue: parseInt(revenue.replace(/\D/g, ""), 10) || 0,
+      kombo_hemat: (komboHemat as "garansi" | "non_garansi") || null,
       created_by: profile?.id ?? null,
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setItems([{ name: "", qty: 1 }]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO()); setStoreAccountId("");
+    setItems([{ name: "", qty: 1 }]); setSo(""); setOrderNo(""); setKet(""); setResiFile(null); setOrderDate(todayISO()); setStoreAccountId(""); setRevenue(""); setKomboHemat("");
     fetchData();
   }
 
@@ -307,12 +311,29 @@ export default function WarehouseOrdersPanel() {
                 <Labeled label="Keterangan">
                   <input value={ket} onChange={(e) => setKet(e.target.value)} placeholder="Keterangan (opsional)" className={INPUT} />
                 </Labeled>
-                <Labeled label="Platform / Toko (untuk Report Harian)">
+                <Labeled label="Platform / Toko">
                   <select value={storeAccountId} onChange={(e) => setStoreAccountId(e.target.value)} className={INPUT}>
-                    <option value="">— Pilih toko (opsional) —</option>
+                    <option value="">— Pilih toko —</option>
                     {storeAccounts.map((s) => (
                       <option key={s.id} value={s.id}>{storeDisplayName(s)}</option>
                     ))}
+                  </select>
+                </Labeled>
+                <Labeled label="Revenue Order (Rp)">
+                  <input
+                    type="number"
+                    min={0}
+                    value={revenue}
+                    onChange={(e) => setRevenue(e.target.value)}
+                    placeholder="Harga jual order ini"
+                    className={INPUT}
+                  />
+                </Labeled>
+                <Labeled label="Kombo Hemat">
+                  <select value={komboHemat} onChange={(e) => setKomboHemat(e.target.value)} className={INPUT}>
+                    <option value="">— Tidak ada —</option>
+                    <option value="garansi">Garansi</option>
+                    <option value="non_garansi">Non Garansi</option>
                   </select>
                 </Labeled>
                 <Labeled label="Resi (opsional)">

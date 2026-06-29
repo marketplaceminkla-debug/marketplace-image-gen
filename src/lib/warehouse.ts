@@ -31,7 +31,66 @@ export interface WarehouseOrder {
   status: OrderStatus;
   resi_url: string | null;
   store_account_id: string | null;
+  revenue: number;
+  kombo_hemat: "garansi" | "non_garansi" | null;
   created_at: string;
+}
+
+export interface AutoReportData {
+  revenue_today: number;
+  revenue_total: number;
+  revenue_estimate: number;
+  deal_qty: number;
+  kombo_garansi: number;
+  kombo_non_garansi: number;
+  deals: { name: string; qty: number }[];
+}
+
+/** Aggregate order data for Report Harian auto-calculation. */
+export async function getAutoReportData(storeAccountId: string, date: string): Promise<AutoReportData> {
+  const [y, m] = date.split("-");
+  const monthStart = `${y}-${m}-01`;
+  const daysInMonth = new Date(parseInt(y), parseInt(m), 0).getDate();
+  const dayOfMonth = parseInt(date.split("-")[2]);
+  const monthEnd = `${y}-${m}-${String(daysInMonth).padStart(2, "0")}`;
+
+  const [{ data: todayOrders }, { data: monthOrders }] = await Promise.all([
+    supabase
+      .from("warehouse_orders")
+      .select("revenue, kombo_hemat, items, item_qtys")
+      .eq("store_account_id", storeAccountId)
+      .eq("order_date", date)
+      .neq("status", "denied"),
+    supabase
+      .from("warehouse_orders")
+      .select("revenue")
+      .eq("store_account_id", storeAccountId)
+      .gte("order_date", monthStart)
+      .lte("order_date", monthEnd)
+      .neq("status", "denied"),
+  ]);
+
+  const revenue_today = (todayOrders ?? []).reduce((s, o) => s + (o.revenue ?? 0), 0);
+  const revenue_total = (monthOrders ?? []).reduce((s, o) => s + (o.revenue ?? 0), 0);
+  const revenue_estimate = dayOfMonth > 0 ? Math.round((revenue_total / dayOfMonth) * daysInMonth) : 0;
+
+  const kombo_garansi = (todayOrders ?? []).filter((o) => o.kombo_hemat === "garansi").length;
+  const kombo_non_garansi = (todayOrders ?? []).filter((o) => o.kombo_hemat === "non_garansi").length;
+
+  // Aggregate deal list (combine same product names)
+  const dealMap = new Map<string, number>();
+  for (const o of todayOrders ?? []) {
+    const names: string[] = o.items?.length ? o.items : [];
+    const qtys: number[] = o.item_qtys ?? [];
+    for (let i = 0; i < names.length; i++) {
+      if (!names[i]) continue;
+      dealMap.set(names[i], (dealMap.get(names[i]) ?? 0) + (qtys[i] ?? 1));
+    }
+  }
+  const deals = Array.from(dealMap.entries()).map(([name, qty]) => ({ name, qty }));
+  const deal_qty = deals.reduce((s, d) => s + d.qty, 0);
+
+  return { revenue_today, revenue_total, revenue_estimate, deal_qty, kombo_garansi, kombo_non_garansi, deals };
 }
 
 export interface OrderItem { name: string; qty: number; }
