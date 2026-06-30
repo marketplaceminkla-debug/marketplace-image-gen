@@ -38,12 +38,18 @@ body,
 .dark .bg-slate-50    { background-color: #1B1828; }
 .dark .bg-slate-100   { background-color: #28243A; }
 .dark .bg-slate-200   { background-color: #322E48; }
+.dark .bg-brand-light { background-color: #3A301A; }
+.dark .bg-success-light { background-color: #16332A; }
+.dark .bg-danger-light  { background-color: #3A1E20; }
+.dark .bg-warning-light { background-color: #3A2E14; }
+.dark .bg-kla-purpleLight { background-color: #2A2350; }
 
 /* Borders */
 .dark .border-slate-100  { border-color: #2A2740; }
 .dark .border-slate-200  { border-color: #322E48; }
 .dark .border-slate-300  { border-color: #423D5E; }
 .dark .border-main-border { border-color: #2E2B44; }
+.dark .border-brand-muted { border-color: #5C4D1F; }
 .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2A2740; }
 
 /* Text */
