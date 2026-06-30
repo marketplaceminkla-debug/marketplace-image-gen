@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Award, TrendingUp, Loader2, Pencil, Check, X } from "lucide-react";
+import { Award, TrendingUp, Loader2, Pencil, Check, X, RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   PIC_LIST, PicName, KpiRow, KpiUnit,
   listIndicators, listActuals, upsertActual, buildKpiRows, fmtKpiValue,
-  updateIndicatorTarget,
+  updateIndicatorTarget, syncKpiFromOrders,
 } from "@/lib/kpi";
 
 const MONTHS_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
@@ -33,7 +33,6 @@ function ProgressBar({ pct }: { pct: number }) {
   );
 }
 
-// ── Inline actual input (blur/enter to save) ──
 function ActualInput({ row, onSave }: { row: KpiRow; onSave: (id: string, val: number) => Promise<void> }) {
   const [val, setVal] = useState(String(row.actual_value));
   const [saving, setSaving] = useState(false);
@@ -65,10 +64,11 @@ function ActualInput({ row, onSave }: { row: KpiRow; onSave: (id: string, val: n
   );
 }
 
-// ── Inline target edit ──
-function TargetEdit({
-  row, onSave, onCancel,
-}: { row: KpiRow; onSave: (id: string, val: number) => Promise<void>; onCancel: () => void }) {
+function TargetEdit({ row, onSave, onCancel }: {
+  row: KpiRow;
+  onSave: (id: string, val: number) => Promise<void>;
+  onCancel: () => void;
+}) {
   const [val, setVal] = useState(String(row.target_value));
   const [saving, setSaving] = useState(false);
 
@@ -102,6 +102,8 @@ export default function KpiTimPanel() {
   const [month, setMonth] = useState(currentMonth());
   const [rows, setRows] = useState<KpiRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -125,23 +127,63 @@ export default function KpiTimPanel() {
     await load();
   }
 
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    const indicators = await listIndicators(pic);
+    const autoInds = indicators.filter((i) => i.source_field);
+    if (!autoInds.length) {
+      setSyncMsg("Tidak ada indikator auto untuk " + pic);
+      setSyncing(false);
+      return;
+    }
+    const { revenue, kombo } = await syncKpiFromOrders(pic, month, autoInds, profile?.id ?? null);
+    await load();
+    setSyncing(false);
+    const parts: string[] = [];
+    if (autoInds.some((i) => i.source_field === "revenue"))
+      parts.push(`Revenue: Rp ${(revenue / 1_000_000).toFixed(1)}jt`);
+    if (autoInds.some((i) => i.source_field === "kombo_total"))
+      parts.push(`Kombo: ${kombo}`);
+    setSyncMsg("Disync: " + parts.join(" · "));
+    setTimeout(() => setSyncMsg(null), 4000);
+  }
+
   const proses = rows.filter((r) => r.category === "proses");
   const hasil  = rows.filter((r) => r.category === "hasil");
   const totalNilai = rows.reduce((s, r) => s + r.nilai_akhir, 0);
   const totalBobot = rows.reduce((s, r) => s + r.bobot, 0);
   const totalPct = totalBobot > 0 ? (totalNilai / totalBobot) * 100 : 0;
+  const hasAutoIndicators = rows.some((r) => r.source_field);
 
   return (
     <div className="p-6 space-y-6 max-w-4xl overflow-y-auto h-full">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center">
-          <Award className="w-5 h-5 text-brand" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center">
+            <Award className="w-5 h-5 text-brand" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">KPI Tim</h1>
+            <p className="text-sm text-slate-400">Capaian KPI bulanan per anggota tim</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-white">KPI Tim</h1>
-          <p className="text-sm text-slate-400">Capaian KPI bulanan per anggota tim · klik ✏️ untuk ubah target</p>
-        </div>
+
+        {/* Sync button */}
+        {hasAutoIndicators && (
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm text-white font-medium transition-all disabled:opacity-60"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Sync…" : "Sync dari Orderan"}
+            </button>
+            {syncMsg && <p className="text-xs text-green-400">{syncMsg}</p>}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -191,37 +233,33 @@ export default function KpiTimPanel() {
                 <div className="divide-y divide-slate-700/50">
                   {data.map((row) => (
                     <div key={row.id} className="px-5 py-4 grid grid-cols-[1fr_auto] gap-4 items-start">
-                      {/* Left */}
                       <div className="space-y-2 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-white">{row.name}</span>
                           <span className="text-xs text-slate-500">bobot {row.bobot}%</span>
+                          {row.source_field && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand/20 text-brand border border-brand/30">
+                              AUTO
+                            </span>
+                          )}
                         </div>
 
                         {/* Target row */}
                         <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400">
                           <span>Target:</span>
                           {editingTargetId === row.id ? (
-                            <TargetEdit
-                              row={row}
-                              onSave={handleSaveTarget}
-                              onCancel={() => setEditingTargetId(null)}
-                            />
+                            <TargetEdit row={row} onSave={handleSaveTarget} onCancel={() => setEditingTargetId(null)} />
                           ) : (
                             <span className="flex items-center gap-1">
                               <b className="text-slate-300">{fmtKpiValue(row.target_value, row.unit as KpiUnit)}</b>
-                              <button
-                                onClick={() => setEditingTargetId(row.id)}
-                                title="Ubah target"
-                                className="text-slate-600 hover:text-brand ml-0.5"
-                              >
+                              <button onClick={() => setEditingTargetId(row.id)} title="Ubah target"
+                                className="text-slate-600 hover:text-brand ml-0.5">
                                 <Pencil size={11} />
                               </button>
                             </span>
                           )}
                         </div>
 
-                        {/* Stats row */}
                         <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
                           <span>Aktual: <b className={capaianColor(row.capaian_pct)}>{fmtKpiValue(row.actual_value, row.unit as KpiUnit)}</b></span>
                           <span>Capaian: <b className={capaianColor(row.capaian_pct)}>{row.capaian_pct.toFixed(0)}%</b></span>
@@ -230,8 +268,13 @@ export default function KpiTimPanel() {
                         <ProgressBar pct={row.capaian_pct} />
                       </div>
 
-                      {/* Right: actual input */}
-                      <ActualInput row={row} onSave={handleSaveActual} />
+                      {/* Right: manual input (disabled + dimmed for AUTO fields) */}
+                      <div className="relative">
+                        <ActualInput row={row} onSave={handleSaveActual} />
+                        {row.source_field && (
+                          <p className="text-[10px] text-slate-500 mt-0.5 text-right">dari orderan</p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

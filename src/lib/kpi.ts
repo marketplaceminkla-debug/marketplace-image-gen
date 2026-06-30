@@ -15,6 +15,7 @@ export interface KpiIndicator {
   bobot: number;
   sort_order: number;
   is_active: boolean;
+  source_field: "revenue" | "kombo_total" | null;
 }
 
 export interface KpiActual {
@@ -61,6 +62,48 @@ export async function listActuals(indicatorIds: string[], month: string): Promis
     .eq("month", month);
   if (error || !data) return [];
   return data as KpiActual[];
+}
+
+/** Sync auto KPI actuals from warehouse_orders for a PIC + month. Returns values synced. */
+export async function syncKpiFromOrders(
+  pic: PicName,
+  month: string,
+  indicators: KpiIndicator[],
+  userId: string | null,
+): Promise<{ revenue: number; kombo: number }> {
+  // 1. Get store account IDs for this PIC (Mauren = all stores)
+  const storeQuery = supabase.from("store_accounts").select("id");
+  if (pic !== "Mauren") storeQuery.eq("pic_name", pic);
+  const { data: stores } = await storeQuery;
+  const storeIds = (stores ?? []).map((s: { id: string }) => s.id);
+
+  if (!storeIds.length) return { revenue: 0, kombo: 0 };
+
+  // 2. Aggregate orders for this month
+  const [y, m] = month.split("-");
+  const daysInMonth = new Date(parseInt(y), parseInt(m), 0).getDate();
+  const monthStart = `${month}-01`;
+  const monthEnd   = `${month}-${String(daysInMonth).padStart(2, "0")}`;
+
+  const { data: orders } = await supabase
+    .from("warehouse_orders")
+    .select("revenue, kombo_hemat")
+    .in("store_account_id", storeIds)
+    .gte("order_date", monthStart)
+    .lte("order_date", monthEnd)
+    .neq("status", "denied");
+
+  const revenue = (orders ?? []).reduce((s: number, o: { revenue: number }) => s + (o.revenue ?? 0), 0);
+  const kombo   = (orders ?? []).filter((o: { kombo_hemat: string | null }) => o.kombo_hemat !== null).length;
+
+  // 3. Upsert actuals for auto indicators
+  for (const ind of indicators) {
+    if (!ind.source_field) continue;
+    const val = ind.source_field === "revenue" ? revenue : kombo;
+    await upsertActual(ind.id, month, val, userId);
+  }
+
+  return { revenue, kombo };
 }
 
 export async function updateIndicatorTarget(id: string, targetValue: number) {
