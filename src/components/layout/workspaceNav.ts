@@ -3,12 +3,12 @@ import {
   Boxes, PackagePlus, Tag, Percent, ArrowLeftRight,
   Warehouse, ClipboardList, Building2,
   Wrench, LayoutTemplate, FileSpreadsheet, Zap, PackageOpen,
-  ShieldCheck, Users, FileText, BarChart2,
+  ShieldCheck, Users, FileText, BarChart2, Award,
   type LucideIcon,
 } from "lucide-react";
 
 export type ViewId =
-  | "dash-overview" | "dash-revenue" | "dash-tal" | "dash-report" | "dash-monitoring"
+  | "dash-overview" | "dash-revenue" | "dash-tal" | "dash-kpi" | "dash-report" | "dash-monitoring"
   | "prod-new" | "prod-price" | "prod-fee" | "prod-sku"
   | "wh-orders" | "wh-list"
   | "ps-template" | "ps-import" | "ps-generate" | "ps-shopee" | "ps-ziptoshopee"
@@ -40,6 +40,7 @@ export const NAV: NavSection[] = [
       { id: "dash-overview", label: "Overview / KPI", shortLabel: "Overview", description: "Ringkasan performa tim", icon: Gauge },
       { id: "dash-revenue", label: "Revenue", shortLabel: "Revenue", description: "Target & progress harian", icon: TrendingUp },
       { id: "dash-tal", label: "TAL", shortLabel: "TAL", description: "To Achieve List", icon: ListChecks },
+      { id: "dash-kpi", label: "KPI Tim", shortLabel: "KPI", description: "Capaian KPI per anggota", icon: Award },
       { id: "dash-report", label: "Report Harian", shortLabel: "Report", description: "Input laporan harian per toko", icon: FileText },
       { id: "dash-monitoring", label: "Monitoring Tren", shortLabel: "Tren", description: "Analitik MoM & YoY", icon: BarChart2 },
     ],
