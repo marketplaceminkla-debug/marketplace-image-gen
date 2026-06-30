@@ -63,6 +63,14 @@ export async function listActuals(indicatorIds: string[], month: string): Promis
   return data as KpiActual[];
 }
 
+export async function updateIndicatorTarget(id: string, targetValue: number) {
+  const { error } = await supabase
+    .from("kpi_indicators")
+    .update({ target_value: targetValue })
+    .eq("id", id);
+  return { error: error ? error.message : null };
+}
+
 export async function upsertActual(
   indicatorId: string,
   month: string,
