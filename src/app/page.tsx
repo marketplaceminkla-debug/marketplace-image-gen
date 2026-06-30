@@ -18,6 +18,8 @@ import PriceUpdatePanel from "@/components/products/PriceUpdatePanel";
 import FeeDatabasePanel from "@/components/products/FeeDatabasePanel";
 import SkuReplacementPanel from "@/components/products/SkuReplacementPanel";
 import TalPanel from "@/components/dashboard/TalPanel";
+import ReportHarianPanel from "@/components/dashboard/ReportHarianPanel";
+import MonitoringPanel from "@/components/dashboard/MonitoringPanel";
 import WarehouseOrdersPanel from "@/components/warehouse/WarehouseOrdersPanel";
 import WarehouseDbPanel from "@/components/warehouse/WarehouseDbPanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
@@ -187,6 +189,10 @@ export default function Home() {
         return <RevenuePanel />;
       case "dash-tal":
         return <TalPanel />;
+      case "dash-report":
+        return <ReportHarianPanel />;
+      case "dash-monitoring":
+        return <MonitoringPanel />;
 
       // ── Product Listing ──
       case "prod-new":
