@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X } from "lucide-react";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
@@ -52,6 +52,17 @@ export default function WarehouseOrdersPanel() {
   const [toDate, setToDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  // Inline edit (fix human error after an order is already listed)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editItems, setEditItems] = useState<{ name: string; qty: number }[]>([{ name: "", qty: 1 }]);
+  const [editSo, setEditSo] = useState("");
+  const [editOrderNo, setEditOrderNo] = useState("");
+  const [editKet, setEditKet] = useState("");
+  const [editEkspedisi, setEditEkspedisi] = useState<Ekspedisi>("reguler");
+  const [editShipment, setEditShipment] = useState<Shipment>("pickup");
+  const [editBusy, setEditBusy] = useState(false);
 
   // form
   const [warehouseId, setWarehouseId] = useState("");
@@ -223,6 +234,48 @@ export default function WarehouseOrdersPanel() {
     if (error) { setError(error); load(); }
   }
 
+  function startEdit(o: WarehouseOrder) {
+    const list = orderItems(o);
+    setEditDate(o.order_date ?? todayISO());
+    setEditItems(list.length ? list.map((it) => ({ name: it.name, qty: it.qty })) : [{ name: "", qty: 1 }]);
+    setEditSo(o.so_number ?? "");
+    setEditOrderNo(o.order_number ?? "");
+    setEditKet(o.keterangan ?? "");
+    setEditEkspedisi(o.ekspedisi);
+    setEditShipment(o.shipment);
+    setEditingId(o.id);
+  }
+  function cancelEdit() { setEditingId(null); }
+
+  const updateEditItemName = (i: number, v: string) => setEditItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, name: v } : it)));
+  const updateEditItemQty = (i: number, v: number) => setEditItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, qty: v } : it)));
+  const addEditItemRow = () => setEditItems((arr) => [...arr, { name: "", qty: 1 }]);
+  const removeEditItemRow = (i: number) => setEditItems((arr) => (arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)));
+
+  async function saveEdit(id: string) {
+    const cleanItems = editItems.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
+    if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
+    if (editSo.trim() && !SO_RE.test(editSo.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
+    setEditBusy(true);
+    setError(null);
+    const patch = {
+      order_date: editDate || todayISO(),
+      item_name: cleanItems[0].name,
+      items: cleanItems.map((it) => it.name),
+      item_qtys: cleanItems.map((it) => it.qty),
+      so_number: editSo.trim() || null,
+      order_number: editOrderNo.trim() || null,
+      keterangan: editKet.trim() || null,
+      ekspedisi: editEkspedisi,
+      shipment: editShipment,
+    };
+    setOrders((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    const { error } = await updateOrder(id, patch);
+    setEditBusy(false);
+    if (error) { setError(error); load(); return; }
+    setEditingId(null);
+  }
+
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
       <div className="px-6 md:px-10 py-6 md:py-8 max-w-4xl">
@@ -388,6 +441,76 @@ export default function WarehouseOrdersPanel() {
                         {ords.map((o) => {
                           const checked = selected.has(o.id);
                           const list = orderItems(o);
+                          const isEditing = editingId === o.id;
+
+                          if (isEditing) {
+                            return (
+                              <div key={o.id} className="bg-white rounded-xl border-2 border-brand shadow-sm p-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  <Labeled label="Tanggal">
+                                    <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={INPUT} />
+                                  </Labeled>
+                                  <div />
+                                  <div className="md:col-span-2">
+                                    <label className="text-[11px] text-slate-500">Barang &amp; jumlah</label>
+                                    <div className="mt-1 space-y-1.5">
+                                      {editItems.map((it, i) => (
+                                        <div key={i} className="flex gap-1.5">
+                                          <input value={it.name} onChange={(e) => updateEditItemName(i, e.target.value)} placeholder={`Nama barang ${i + 1}`} className={INPUT} />
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            value={it.qty}
+                                            onChange={(e) => updateEditItemQty(i, Number(e.target.value))}
+                                            title="Jumlah (qty)"
+                                            className="shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                                          />
+                                          {editItems.length > 1 && (
+                                            <button type="button" onClick={() => removeEditItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
+                                              <X size={15} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      ))}
+                                      <button type="button" onClick={addEditItemRow} className="inline-flex items-center gap-1 text-xs font-medium text-brand-hover hover:underline">
+                                        <Plus size={13} /> Tambah item
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <Labeled label="Nomor SO">
+                                    <input value={editSo} onChange={(e) => setEditSo(formatSo(e.target.value))} placeholder="SO/12345/123456" inputMode="numeric" maxLength={15} className={INPUT} />
+                                  </Labeled>
+                                  <Labeled label="Nomor Pesanan">
+                                    <input value={editOrderNo} onChange={(e) => setEditOrderNo(e.target.value)} placeholder="No Pesanan" className={INPUT} />
+                                  </Labeled>
+                                  <Labeled label="Ekspedisi">
+                                    <select value={editEkspedisi} onChange={(e) => setEditEkspedisi(e.target.value as Ekspedisi)} className={INPUT}>
+                                      <option value="instan">Instan</option>
+                                      <option value="reguler">Reguler</option>
+                                    </select>
+                                  </Labeled>
+                                  <Labeled label="Shipment">
+                                    <select value={editShipment} onChange={(e) => setEditShipment(e.target.value as Shipment)} className={INPUT}>
+                                      <option value="dropoff">Drop off</option>
+                                      <option value="pickup">Pickup</option>
+                                    </select>
+                                  </Labeled>
+                                  <Labeled label="Keterangan">
+                                    <input value={editKet} onChange={(e) => setEditKet(e.target.value)} placeholder="Keterangan (opsional)" className={INPUT} />
+                                  </Labeled>
+                                </div>
+                                <div className="flex items-center gap-2 mt-3">
+                                  <button onClick={() => saveEdit(o.id)} disabled={editBusy} className="btn-bounce inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand hover:bg-brand-hover text-slate-900 text-xs font-semibold disabled:opacity-60">
+                                    {editBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
+                                  </button>
+                                  <button onClick={cancelEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 text-xs font-semibold hover:bg-slate-50">
+                                    <X size={13} /> Batal
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div key={o.id} className={`bg-white rounded-xl border shadow-sm p-3 ${checked ? "border-brand" : "border-slate-200"}`}>
                               <div className="flex items-start gap-3">
@@ -412,6 +535,9 @@ export default function WarehouseOrdersPanel() {
                                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                                     <button onClick={() => send(wh, [o])} className="inline-flex items-center gap-1 text-xs font-medium text-success hover:underline">
                                       <Send size={13} /> Kirim 1 ini
+                                    </button>
+                                    <button onClick={() => startEdit(o)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-brand-hover">
+                                      <Pencil size={13} /> Edit
                                     </button>
                                     <label className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-brand-hover cursor-pointer">
                                       {uploadingId === o.id ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
