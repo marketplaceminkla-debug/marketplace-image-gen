@@ -52,7 +52,8 @@ export default function ReportHarianPanel() {
 
   const [chatCount, setChatCount] = useState("");
   const [uploadCount, setUploadCount] = useState("");
-  const [lossNotes, setLossNotes] = useState("");
+  const [lossItems, setLossItems] = useState<string[]>([]);
+  const [newLossItem, setNewLossItem] = useState("");
 
   const [newPendingName, setNewPendingName] = useState("");
 
@@ -97,10 +98,10 @@ export default function ReportHarianPanel() {
       setReport(rep);
       setChatCount(rep.chat_count > 0 ? String(rep.chat_count) : "");
       setUploadCount(rep.upload_count > 0 ? String(rep.upload_count) : "");
-      setLossNotes(rep.loss_notes ?? "");
+      setLossItems(rep.loss_notes ? rep.loss_notes.split("\n").filter(Boolean).map((l) => l.replace(/^\d+\.\s*/, "")) : []);
     } else {
       setReport(null);
-      setChatCount(""); setUploadCount(""); setLossNotes("");
+      setChatCount(""); setUploadCount(""); setLossItems([]);
     }
     setLoadingAuto(false);
   }, [picName, date, stores]);
@@ -141,7 +142,7 @@ export default function ReportHarianPanel() {
         upload_count: parseInt(uploadCount) || 0,
         kombo_non_garansi: autoData.kombo_non_garansi,
         kombo_garansi: autoData.kombo_garansi,
-        loss_notes: lossNotes.trim() || null,
+        loss_notes: lossText || null,
       },
       profile?.id ?? null
     );
@@ -190,7 +191,7 @@ export default function ReportHarianPanel() {
       date,
       parseInt(chatCount) || 0,
       parseInt(uploadCount) || 0,
-      lossNotes,
+      lossText,
     );
     setWaText(text);
     setShowWa(true);
@@ -205,6 +206,18 @@ export default function ReportHarianPanel() {
 
   // WA link to first store's PIC number (same person, all stores)
   const picWa = picStores[0]?.pic_wa ?? null;
+
+  // Loss list, numbered like Pending, stored as a single newline-joined string.
+  const lossText = lossItems.length ? lossItems.map((l, i) => `${i + 1}. ${l}`).join("\n") : "";
+  function handleAddLossItem() {
+    const v = newLossItem.trim();
+    if (!v) return;
+    setLossItems((arr) => [...arr, v]);
+    setNewLossItem("");
+  }
+  function handleRemoveLossItem(i: number) {
+    setLossItems((arr) => arr.filter((_, idx) => idx !== i));
+  }
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
@@ -351,10 +364,32 @@ export default function ReportHarianPanel() {
           </SectionCard>
 
           <SectionCard title="Loss (isi manual)">
-            <input type="text" value={lossNotes}
-              onChange={(e) => setLossNotes(e.target.value)}
-              placeholder="Kosongkan jika tidak ada loss"
-              className={INPUT} />
+            {lossItems.length > 0 && (
+              <div className="space-y-1.5 mb-2">
+                {lossItems.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg px-3 py-2 bg-danger-light">
+                    <span className="flex-1 text-sm text-slate-800">{item}</span>
+                    <button type="button" onClick={() => handleRemoveLossItem(i)} className="shrink-0 text-slate-400 hover:text-danger">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text" value={newLossItem}
+                onChange={(e) => setNewLossItem(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddLossItem(); } }}
+                placeholder="Produk yang loss (misal: Asus V16 rusak)"
+                className={INPUT}
+              />
+              <button type="button" onClick={handleAddLossItem}
+                className="shrink-0 px-3 py-2 rounded-lg bg-danger-light hover:bg-danger hover:text-white text-danger font-semibold text-xs border border-danger/30">
+                <Plus size={15} />
+              </button>
+            </div>
+            {lossItems.length === 0 && <p className="text-[11px] text-slate-400 mt-1.5">Kosongkan jika tidak ada loss.</p>}
           </SectionCard>
 
           <button type="submit" disabled={saving || !autoData}
