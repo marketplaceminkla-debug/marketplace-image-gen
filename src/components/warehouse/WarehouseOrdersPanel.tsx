@@ -64,6 +64,9 @@ export default function WarehouseOrdersPanel() {
   const [editKet, setEditKet] = useState("");
   const [editEkspedisi, setEditEkspedisi] = useState<Ekspedisi>("reguler");
   const [editShipment, setEditShipment] = useState<Shipment>("pickup");
+  const [editStoreAccountId, setEditStoreAccountId] = useState<string>("");
+  const [editRevenue, setEditRevenue] = useState<string>("");
+  const [editKomboHemat, setEditKomboHemat] = useState<string>("");
   const [editBusy, setEditBusy] = useState(false);
 
   // form
@@ -252,6 +255,9 @@ export default function WarehouseOrdersPanel() {
     setEditKet(o.keterangan ?? "");
     setEditEkspedisi(o.ekspedisi);
     setEditShipment(o.shipment);
+    setEditStoreAccountId(o.store_account_id ?? "");
+    setEditRevenue(o.revenue ? String(o.revenue) : "");
+    setEditKomboHemat(o.kombo_hemat ?? "");
     setEditingId(o.id);
   }
   function cancelEdit() { setEditingId(null); }
@@ -277,6 +283,9 @@ export default function WarehouseOrdersPanel() {
       keterangan: editKet.trim() || null,
       ekspedisi: editEkspedisi,
       shipment: editShipment,
+      store_account_id: editStoreAccountId || null,
+      revenue: parseInt(editRevenue.replace(/\D/g, ""), 10) || 0,
+      kombo_hemat: (editKomboHemat as "garansi" | "non_garansi") || null,
     };
     setOrders((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
     const { error } = await updateOrder(id, patch);
@@ -531,6 +540,31 @@ export default function WarehouseOrdersPanel() {
                                   </Labeled>
                                   <Labeled label="Keterangan">
                                     <input value={editKet} onChange={(e) => setEditKet(e.target.value)} placeholder="Keterangan (opsional)" className={INPUT} />
+                                  </Labeled>
+                                  <Labeled label="Platform / Toko">
+                                    <select value={editStoreAccountId} onChange={(e) => setEditStoreAccountId(e.target.value)} className={INPUT}>
+                                      <option value="">— Pilih toko —</option>
+                                      {storeAccounts.map((s) => (
+                                        <option key={s.id} value={s.id}>{storeDisplayName(s)}</option>
+                                      ))}
+                                    </select>
+                                  </Labeled>
+                                  <Labeled label="Revenue Order (Rp)">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={editRevenue}
+                                      onChange={(e) => setEditRevenue(e.target.value)}
+                                      placeholder="Harga jual order ini"
+                                      className={INPUT}
+                                    />
+                                  </Labeled>
+                                  <Labeled label="Kombo Hemat">
+                                    <select value={editKomboHemat} onChange={(e) => setEditKomboHemat(e.target.value)} className={INPUT}>
+                                      <option value="">— Tidak ada —</option>
+                                      <option value="garansi">Garansi</option>
+                                      <option value="non_garansi">Non Garansi</option>
+                                    </select>
                                   </Labeled>
                                 </div>
                                 <div className="flex items-center gap-2 mt-3">
