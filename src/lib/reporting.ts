@@ -183,6 +183,18 @@ export async function listPendingItems(storeAccountId?: string): Promise<Pending
   return (data as PendingItem[]) ?? [];
 }
 
+/** Pending items across multiple stores (PIC-level). */
+export async function listPendingItemsForStores(storeIds: string[]): Promise<PendingItem[]> {
+  if (!storeIds.length) return [];
+  const { data } = await supabase
+    .from("report_pending_items")
+    .select("*")
+    .in("store_account_id", storeIds)
+    .order("status")
+    .order("report_date", { ascending: false });
+  return (data as PendingItem[]) ?? [];
+}
+
 export async function listOpenPendingItems(): Promise<PendingItem[]> {
   const { data } = await supabase
     .from("report_pending_items")
@@ -315,6 +327,45 @@ export function buildReportWaMessage(
     `Garansi : ${report.kombo_garansi > 0 ? report.kombo_garansi : "-"}\n\n` +
     `Pending :\n${pendingLines}\n\n` +
     `Loss : ${report.loss_notes || "-"}`
+  );
+}
+
+/** Build WA report for a PIC (aggregates all their stores). */
+export function buildPicWaMessage(
+  picName: string,
+  report: DailySalesReport | null,
+  autoData: { revenue_today: number; revenue_total: number; revenue_estimate: number; deal_qty: number; kombo_garansi: number; kombo_non_garansi: number; deals: { name: string; qty: number }[] },
+  pendingItems: PendingItem[],
+  target: number,
+  date: string,
+  chatCount: number,
+  uploadCount: number,
+  lossNotes: string,
+): string {
+  const [y, m, d] = date.split("-");
+  const dateStr = `${d}/${m}/${y}`;
+  const dealLines = autoData.deals.length
+    ? autoData.deals.map((dd) => `${dd.qty} unit\t${dd.name}`).join("\n")
+    : "-";
+  const openPending = pendingItems.filter((p) => p.status === "pending");
+  const pendingLines = openPending.length
+    ? openPending.map((p, i) => `${i + 1}. ${p.product_name}`).join("\n")
+    : "-";
+  return (
+    `Report ${picName} ${dateStr}\n\n` +
+    `TARGET : ${formatIDR(target)}\n` +
+    `Total Revenue : ${formatIDR(autoData.revenue_total)}\n` +
+    `Revenue Hari Ini : ${formatIDR(autoData.revenue_today)}\n` +
+    `Estimasi Revenue : ${formatIDR(autoData.revenue_estimate)}\n\n` +
+    `Chat : ${chatCount}\n` +
+    `Deal : ${autoData.deal_qty}\n` +
+    `${dealLines}\n\n` +
+    `Upload produk : ${uploadCount > 0 ? uploadCount : "-"}\n\n` +
+    `Kombo Hemat\n` +
+    `Non Garansi : ${autoData.kombo_non_garansi > 0 ? autoData.kombo_non_garansi : "-"}\n` +
+    `Garansi : ${autoData.kombo_garansi > 0 ? autoData.kombo_garansi : "-"}\n\n` +
+    `Pending :\n${pendingLines}\n\n` +
+    `Loss : ${lossNotes || "-"}`
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   FileText, Plus, Trash2, Loader2, Send, Copy, Check,
   CheckCircle2, Circle, RefreshCw, X, Zap,
@@ -9,11 +9,11 @@ import { useAuth } from "@/lib/auth";
 import {
   StoreAccount, DailySalesReport, PendingItem,
   listStoreAccounts, getDailyReport, upsertDailyReport,
-  listPendingItems, addPendingItem, updatePendingStatus, deletePendingItem,
+  listPendingItemsForStores, addPendingItem, updatePendingStatus, deletePendingItem,
   getMonthlyTarget, setMonthlyTarget,
-  storeDisplayName, formatIDR, buildReportWaMessage,
+  formatIDR, buildPicWaMessage,
 } from "@/lib/reporting";
-import { getAutoReportData, AutoReportData } from "@/lib/warehouse";
+import { getAutoReportDataForStores, AutoReportData } from "@/lib/warehouse";
 
 const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
 
@@ -24,30 +24,38 @@ function todayISO() {
 export default function ReportHarianPanel() {
   const { profile } = useAuth();
 
-  // Selection
   const [stores, setStores] = useState<StoreAccount[]>([]);
-  const [storeId, setStoreId] = useState("");
+  const [picName, setPicName] = useState("");
   const [date, setDate] = useState(todayISO());
 
-  // Auto data dari warehouse orders
+  // Unique PIC names from stores (sorted)
+  const picNames = useMemo(() => {
+    const seen: Record<string, true> = {};
+    const names: string[] = [];
+    stores.forEach((s) => { if (!seen[s.pic_name]) { seen[s.pic_name] = true; names.push(s.pic_name); } });
+    return names.sort();
+  }, [stores]);
+  // All stores for selected PIC
+  const picStores = useMemo(() => stores.filter((s) => s.pic_name === picName), [stores, picName]);
+  // Use first store as representative for saving manual report
+  const primaryStoreId = picStores[0]?.id ?? "";
+  // All store IDs for the selected PIC
+  const picStoreIds = useMemo(() => picStores.map((s) => s.id), [picStores]);
+
   const [autoData, setAutoData] = useState<AutoReportData | null>(null);
   const [loadingAuto, setLoadingAuto] = useState(false);
 
-  // Loaded report
   const [report, setReport] = useState<DailySalesReport | null>(null);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [target, setTarget] = useState(0);
   const [targetInput, setTargetInput] = useState("");
 
-  // Manual fields only
   const [chatCount, setChatCount] = useState("");
   const [uploadCount, setUploadCount] = useState("");
   const [lossNotes, setLossNotes] = useState("");
 
-  // Pending form
   const [newPendingName, setNewPendingName] = useState("");
 
-  // UI
   const [saving, setSaving] = useState(false);
   const [savingTarget, setSavingTarget] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,26 +67,25 @@ export default function ReportHarianPanel() {
   useEffect(() => {
     listStoreAccounts().then((s) => {
       setStores(s);
-      if (s.length > 0) setStoreId(s[0].id);
+      if (s.length > 0) setPicName(s[0].pic_name);
     });
   }, []);
 
-  const selectedStore = stores.find((s) => s.id === storeId) ?? null;
-
   const loadData = useCallback(async () => {
-    if (!storeId || !date || !selectedStore) return;
+    if (!picName || !date) return;
+    const myStores = stores.filter((s) => s.pic_name === picName);
+    const primaryId = myStores[0]?.id ?? "";
+    if (!primaryId) return;
+
     setLoadingAuto(true);
     setError(null);
 
+    const storeIds = myStores.map((s) => s.id);
     const [rep, t, auto, pending] = await Promise.all([
-      getDailyReport(storeId, date),
-      getMonthlyTarget(
-        selectedStore.pic_name,
-        parseInt(date.split("-")[1]),
-        parseInt(date.split("-")[0])
-      ),
-      getAutoReportData(storeId, date),
-      listPendingItems(storeId),
+      getDailyReport(primaryId, date),
+      getMonthlyTarget(picName, parseInt(date.split("-")[1]), parseInt(date.split("-")[0])),
+      getAutoReportDataForStores(storeIds, date),
+      listPendingItemsForStores(storeIds),
     ]);
 
     setTarget(t);
@@ -96,40 +103,36 @@ export default function ReportHarianPanel() {
       setChatCount(""); setUploadCount(""); setLossNotes("");
     }
     setLoadingAuto(false);
-  }, [storeId, date, selectedStore]);
+  }, [picName, date, stores]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   async function handleRefreshAuto() {
-    if (!storeId || !date) return;
+    if (!picName || !date) return;
     setLoadingAuto(true);
-    const auto = await getAutoReportData(storeId, date);
+    const storeIds = stores.filter((s) => s.pic_name === picName).map((s) => s.id);
+    const auto = await getAutoReportDataForStores(storeIds, date);
     setAutoData(auto);
     setLoadingAuto(false);
   }
 
   async function handleSaveTarget() {
-    if (!selectedStore) return;
+    if (!picName) return;
     setSavingTarget(true);
     const t = parseInt(targetInput.replace(/\D/g, ""), 10) || 0;
-    const { error: err } = await setMonthlyTarget(
-      selectedStore.pic_name,
-      parseInt(date.split("-")[1]),
-      parseInt(date.split("-")[0]),
-      t
-    );
+    const { error: err } = await setMonthlyTarget(picName, parseInt(date.split("-")[1]), parseInt(date.split("-")[0]), t);
     setSavingTarget(false);
     if (!err) setTarget(t);
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!autoData) return;
+    if (!autoData || !primaryStoreId) return;
     setSaving(true);
     setError(null);
 
     const { error: err } = await upsertDailyReport(
-      storeId, date,
+      primaryStoreId, date,
       {
         revenue_today: autoData.revenue_today,
         revenue_total: autoData.revenue_total,
@@ -144,7 +147,7 @@ export default function ReportHarianPanel() {
     );
     setSaving(false);
     if (err) { setError(err); return; }
-    const rep = await getDailyReport(storeId, date);
+    const rep = await getDailyReport(primaryStoreId, date);
     setReport(rep);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -152,11 +155,11 @@ export default function ReportHarianPanel() {
 
   async function handleAddPending(e: React.FormEvent) {
     e.preventDefault();
-    if (!newPendingName.trim() || !storeId) return;
+    if (!newPendingName.trim() || !primaryStoreId) return;
     setError(null);
-    const { error: err } = await addPendingItem(storeId, date, newPendingName.trim());
+    const { error: err } = await addPendingItem(primaryStoreId, date, newPendingName.trim());
     if (err) { setError(err); return; }
-    const updated = await listPendingItems(storeId);
+    const updated = await listPendingItemsForStores(picStoreIds);
     setPendingItems(updated);
     setNewPendingName("");
   }
@@ -173,29 +176,21 @@ export default function ReportHarianPanel() {
   }
 
   function handleGenerateWA() {
-    if (!report || !selectedStore || !autoData) {
+    if (!report || !picName || !autoData) {
       setError("Simpan report dulu sebelum generate WA.");
       return;
     }
-    // Build fake report from auto data + manual
-    const liveReport: DailySalesReport = {
-      ...report,
-      revenue_today: autoData.revenue_today,
-      revenue_total: autoData.revenue_total,
-      revenue_estimate: autoData.revenue_estimate,
-      kombo_garansi: autoData.kombo_garansi,
-      kombo_non_garansi: autoData.kombo_non_garansi,
-      chat_count: parseInt(chatCount) || 0,
-    };
-    // Build deals from autoData
-    const deals = autoData.deals.map((d, i) => ({
-      id: String(i),
-      report_id: report.id,
-      product_name: d.name,
-      qty: d.qty,
-      created_at: "",
-    }));
-    const text = buildReportWaMessage(selectedStore, liveReport, deals, pendingItems, target);
+    const text = buildPicWaMessage(
+      picName,
+      report,
+      autoData,
+      pendingItems,
+      target,
+      date,
+      parseInt(chatCount) || 0,
+      parseInt(uploadCount) || 0,
+      lossNotes,
+    );
     setWaText(text);
     setShowWa(true);
     setCopied(false);
@@ -206,6 +201,9 @@ export default function ReportHarianPanel() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  // WA link to first store's PIC number (same person, all stores)
+  const picWa = picStores[0]?.pic_wa ?? null;
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
@@ -224,25 +222,32 @@ export default function ReportHarianPanel() {
 
         {error && <p className="text-xs text-danger bg-danger-light rounded-lg px-3 py-2 mb-4">{error}</p>}
 
-        {/* Store + Date */}
+        {/* PIC + Date */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Labeled label="Toko / PIC">
-            <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className={INPUT}>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>{storeDisplayName(s)}</option>
+          <Labeled label="PIC">
+            <select value={picName} onChange={(e) => setPicName(e.target.value)} className={INPUT}>
+              {picNames.map((p) => (
+                <option key={p} value={p}>{p}</option>
               ))}
             </select>
           </Labeled>
           <Labeled label="Tanggal">
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={INPUT} />
           </Labeled>
+          {picStores.length > 0 && (
+            <div className="md:col-span-2">
+              <p className="text-[11px] text-slate-400">
+                Toko: {picStores.map((s) => s.name).join(" · ")}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Target Bulanan */}
         <SectionCard title="Target Bulanan">
           <div className="flex gap-2 items-end">
             <div className="flex-1">
-              <Labeled label={`Target ${selectedStore?.pic_name ?? ""} bulan ini`}>
+              <Labeled label={`Target ${picName} bulan ini`}>
                 <input
                   type="number" min={0}
                   value={targetInput}
@@ -284,7 +289,6 @@ export default function ReportHarianPanel() {
             </div>
           ) : (
             <>
-              {/* Revenue cards */}
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <AutoCard label="Revenue Hari Ini" value={formatIDR(autoData.revenue_today)} />
                 <AutoCard label="Total Bulan Ini" value={formatIDR(autoData.revenue_total)} />
@@ -303,14 +307,12 @@ export default function ReportHarianPanel() {
                 </div>
               )}
 
-              {/* Deal + Kombo */}
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <AutoCard label="Total Deal" value={`${autoData.deal_qty} unit`} />
                 <AutoCard label="Kombo Garansi" value={String(autoData.kombo_garansi)} />
                 <AutoCard label="Kombo Non Garansi" value={String(autoData.kombo_non_garansi)} />
               </div>
 
-              {/* Deal list */}
               {autoData.deals.length > 0 && (
                 <div className="space-y-1 mt-2">
                   <p className="text-[11px] text-slate-400 font-medium">Detail deal hari ini:</p>
@@ -325,7 +327,7 @@ export default function ReportHarianPanel() {
 
               {autoData.deal_qty === 0 && (
                 <p className="text-xs text-slate-400 text-center py-2">
-                  Belum ada orderan untuk toko ini hari ini. Input di menu Multiwarehouse → Orderan.
+                  Belum ada orderan untuk {picName} hari ini. Input di menu Multiwarehouse → Orderan.
                 </p>
               )}
             </>
@@ -406,7 +408,7 @@ export default function ReportHarianPanel() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-              <h2 className="font-bold text-slate-900">Report WA</h2>
+              <h2 className="font-bold text-slate-900">Report WA — {picName}</h2>
               <button onClick={() => setShowWa(false)} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -419,8 +421,8 @@ export default function ReportHarianPanel() {
                 {copied ? <Check size={15} /> : <Copy size={15} />}
                 {copied ? "Tersalin!" : "Salin Teks"}
               </button>
-              {selectedStore?.pic_wa && (
-                <a href={`https://wa.me/${selectedStore.pic_wa.replace(/\D/g, "")}?text=${encodeURIComponent(waText)}`}
+              {picWa && (
+                <a href={`https://wa.me/${picWa.replace(/\D/g, "")}?text=${encodeURIComponent(waText)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="px-4 py-2.5 rounded-xl bg-success text-white font-semibold text-sm flex items-center gap-2">
                   <Send size={15} /> Kirim WA
