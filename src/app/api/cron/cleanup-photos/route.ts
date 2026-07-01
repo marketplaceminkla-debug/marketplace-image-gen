@@ -8,26 +8,35 @@ export const maxDuration = 60;
 const RETENTION_DAYS = 7;
 
 /**
- * Weekly cleanup of generated product photos (bucket: product-photos).
- * Triggered by Vercel Cron (see vercel.json). Protected by CRON_SECRET:
- * Vercel sends it as a Bearer token automatically when the env var is set.
+ * Cleanup of generated product photos (bucket: product-photos). Two ways in:
+ * 1. Vercel Cron (see vercel.json) sends `Bearer <CRON_SECRET>` automatically
+ *    once that env var is set — runs weekly, unattended.
+ * 2. A logged-in Super Admin can also trigger this on demand from the app
+ *    (Admin → Kelola Akun) by sending their own session token — useful right
+ *    now while CRON_SECRET isn't set yet, or to clear storage in a hurry.
  *
  * Only product-photos is touched — frame templates, Shopee templates, and
  * warehouse resi files are left alone.
  */
 export async function GET(req: Request) {
+  const provided = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return NextResponse.json(
-      { error: "CRON_SECRET belum diset di Vercel — pembersihan dimatikan demi keamanan." },
-      { status: 503 }
-    );
+
+  let authorized = !!secret && provided === secret;
+  if (!authorized && provided) {
+    const { data: userRes } = await supabase.auth.getUser(provided);
+    if (userRes?.user) {
+      const { data: prof } = await supabase.from("profiles").select("role").eq("id", userRes.user.id).single();
+      authorized = prof?.role === "super_admin";
+    }
   }
-  if (req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const daysParam = new URL(req.url).searchParams.get("days");
+  const retentionDays = daysParam ? Math.max(0, parseInt(daysParam, 10) || RETENTION_DAYS) : RETENTION_DAYS;
+  const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   const bucket = PRODUCT_PHOTOS_BUCKET;
   const toDelete: string[] = [];
 
@@ -66,7 +75,7 @@ export async function GET(req: Request) {
       deleted += batch.length;
     }
 
-    return NextResponse.json({ ok: true, bucket, retentionDays: RETENTION_DAYS, deleted });
+    return NextResponse.json({ ok: true, bucket, retentionDays, deleted });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : String(err) },

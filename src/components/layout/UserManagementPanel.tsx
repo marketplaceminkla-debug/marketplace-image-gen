@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Users, RefreshCw, Loader2, Check, UserPlus, Copy, X } from "lucide-react";
+import { Users, RefreshCw, Loader2, Check, UserPlus, Copy, X, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, type Profile, type Role } from "@/lib/auth";
 
@@ -33,6 +33,10 @@ export default function UserManagementPanel() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createdAccount, setCreatedAccount] = useState<CreatedAccount | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Maintenance: manually run the product-photos cleanup (normally weekly via Vercel Cron)
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +110,23 @@ export default function UserManagementPanel() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleCleanupPhotos() {
+    setCleaning(true);
+    setCleanupMsg(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setCleanupMsg("Sesi habis, coba login ulang."); setCleaning(false); return; }
+    try {
+      const res = await fetch("/api/cron/cleanup-photos", { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      if (!res.ok || !json.ok) { setCleanupMsg(json.error || "Gagal membersihkan foto."); setCleaning(false); return; }
+      setCleanupMsg(`Selesai! ${json.deleted} foto lama (>${json.retentionDays} hari) dihapus dari storage.`);
+    } catch {
+      setCleanupMsg("Gagal terhubung ke server.");
+    }
+    setCleaning(false);
+  }
+
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
       <div className="px-6 md:px-10 py-6 md:py-8">
@@ -136,6 +157,20 @@ export default function UserManagementPanel() {
         </div>
 
         {error && <p className="text-xs text-danger bg-danger-light rounded-lg px-3 py-2 mb-4">{error}</p>}
+
+        {/* Maintenance: manual storage cleanup */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-5 mb-4">
+          <p className="text-sm font-bold text-slate-900 mb-1">Maintenance</p>
+          <p className="text-xs text-slate-500 mb-3">Hapus foto hasil generate yang lebih tua dari 7 hari dari Supabase Storage (biasanya otomatis tiap minggu — ini buat bersihin manual sekarang juga).</p>
+          {cleanupMsg && <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-3">{cleanupMsg}</p>}
+          <button
+            onClick={handleCleanupPhotos}
+            disabled={cleaning}
+            className="btn-bounce inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-danger/30 bg-danger-light text-danger text-sm font-semibold hover:bg-danger hover:text-white disabled:opacity-60"
+          >
+            {cleaning ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Bersihkan Foto Lama Sekarang
+          </button>
+        </div>
 
         {showAddForm && (
           <form onSubmit={handleCreateAccount} className="bg-white rounded-2xl border border-brand-muted shadow-sm p-4 md:p-5 mb-4">
