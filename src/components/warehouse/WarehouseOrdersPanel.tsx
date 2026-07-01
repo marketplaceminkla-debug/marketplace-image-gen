@@ -69,6 +69,19 @@ export default function WarehouseOrdersPanel() {
   const [editKomboHemat, setEditKomboHemat] = useState<string>("");
   const [editBusy, setEditBusy] = useState(false);
 
+  // "Satpam": block duplicate SO / Nomor Pesanan to cut down double-input human error.
+  const [dupWarning, setDupWarning] = useState<string | null>(null);
+  const checkDuplicate = useCallback((soVal: string, orderNoVal: string, excludeId?: string): string | null => {
+    const soClean = soVal.trim();
+    const noClean = orderNoVal.trim();
+    const soDupe = !!soClean && orders.some((o) => o.id !== excludeId && (o.so_number ?? "").trim() === soClean);
+    const noDupe = !!noClean && orders.some((o) => o.id !== excludeId && (o.order_number ?? "").trim() === noClean);
+    if (soDupe && noDupe) return "NOMOR SO DAN NOMOR PESANAN SUDAH ADA! NGANTUK CUCI MUKA!";
+    if (soDupe) return "NOMOR SO SUDAH ADA! NGANTUK CUCI MUKA!";
+    if (noDupe) return "NOMOR PESANAN SUDAH ADA! NGANTUK CUCI MUKA!";
+    return null;
+  }, [orders]);
+
   // form
   const [warehouseId, setWarehouseId] = useState("");
   const [orderDate, setOrderDate] = useState(todayISO());
@@ -161,6 +174,8 @@ export default function WarehouseOrdersPanel() {
     const cleanItems = items.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
     if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
     if (so.trim() && !SO_RE.test(so.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
+    const dup = checkDuplicate(so, orderNo);
+    if (dup) { setDupWarning(dup); return; }
     setBusy(true);
     setError(null);
     let resi_url: string | null = null;
@@ -271,6 +286,8 @@ export default function WarehouseOrdersPanel() {
     const cleanItems = editItems.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
     if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
     if (editSo.trim() && !SO_RE.test(editSo.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
+    const dup = checkDuplicate(editSo, editOrderNo, id);
+    if (dup) { setDupWarning(dup); return; }
     setEditBusy(true);
     setError(null);
     const patch = {
@@ -631,6 +648,24 @@ export default function WarehouseOrdersPanel() {
           </>
         )}
       </div>
+
+      {/* Satpam: duplicate SO / Nomor Pesanan popup */}
+      {dupWarning && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-danger-light flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🛑</span>
+            </div>
+            <p className="font-bold text-slate-900 text-lg leading-snug">{dupWarning}</p>
+            <button
+              onClick={() => setDupWarning(null)}
+              className="btn-bounce mt-5 w-full py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-slate-900 font-semibold text-sm"
+            >
+              Oke, gua cek lagi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
