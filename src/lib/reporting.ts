@@ -230,6 +230,16 @@ export async function addPendingItem(
   return { error: error ? error.message : null };
 }
 
+export async function updatePendingItem(
+  id: string, productName: string
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("report_pending_items")
+    .update({ product_name: productName })
+    .eq("id", id);
+  return { error: error ? error.message : null };
+}
+
 export async function updatePendingStatus(
   id: string, status: "pending" | "done"
 ): Promise<{ error: string | null }> {

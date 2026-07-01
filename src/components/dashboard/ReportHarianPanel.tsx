@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   FileText, Plus, Trash2, Loader2, Send, Copy, Check,
-  CheckCircle2, Circle, RefreshCw, X, Zap,
+  CheckCircle2, Circle, RefreshCw, X, Zap, Pencil,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   StoreAccount, DailySalesReport, PendingItem,
   listStoreAccounts, getDailyReport, upsertDailyReport,
-  listPendingItemsForStores, addPendingItem, updatePendingStatus, deletePendingItem,
+  listPendingItemsForStores, addPendingItem, updatePendingItem, updatePendingStatus, deletePendingItem,
   getMonthlyTarget, setMonthlyTarget,
   formatIDR, buildPicWaMessage,
 } from "@/lib/reporting";
@@ -56,6 +56,10 @@ export default function ReportHarianPanel() {
   const [newLossItem, setNewLossItem] = useState("");
 
   const [newPendingName, setNewPendingName] = useState("");
+  const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
+  const [editPendingText, setEditPendingText] = useState("");
+  const [editingLossIdx, setEditingLossIdx] = useState<number | null>(null);
+  const [editLossText, setEditLossText] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [savingTarget, setSavingTarget] = useState(false);
@@ -174,6 +178,31 @@ export default function ReportHarianPanel() {
   async function handleRemovePending(id: string) {
     setPendingItems((arr) => arr.filter((x) => x.id !== id));
     await deletePendingItem(id);
+  }
+
+  function startEditPending(p: PendingItem) {
+    setEditingPendingId(p.id);
+    setEditPendingText(p.product_name);
+  }
+  function cancelEditPending() { setEditingPendingId(null); }
+  async function saveEditPending(id: string) {
+    const v = editPendingText.trim();
+    if (!v) return;
+    setPendingItems((arr) => arr.map((x) => (x.id === id ? { ...x, product_name: v } : x)));
+    setEditingPendingId(null);
+    await updatePendingItem(id, v);
+  }
+
+  function startEditLoss(i: number) {
+    setEditingLossIdx(i);
+    setEditLossText(lossItems[i]);
+  }
+  function cancelEditLoss() { setEditingLossIdx(null); }
+  function saveEditLoss(i: number) {
+    const v = editLossText.trim();
+    if (!v) return;
+    setLossItems((arr) => arr.map((x, idx) => (idx === i ? v : x)));
+    setEditingLossIdx(null);
   }
 
   function handleGenerateWA() {
@@ -366,14 +395,35 @@ export default function ReportHarianPanel() {
           <SectionCard title="Loss (isi manual)">
             {lossItems.length > 0 && (
               <div className="space-y-1.5 mb-2">
-                {lossItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-lg px-3 py-2 bg-danger-light">
-                    <span className="flex-1 text-sm text-slate-800">{item}</span>
-                    <button type="button" onClick={() => handleRemoveLossItem(i)} className="shrink-0 text-slate-400 hover:text-danger">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
+                {lossItems.map((item, i) => {
+                  const isEditing = editingLossIdx === i;
+                  return (
+                    <div key={i} className="flex items-center gap-2 rounded-lg px-3 py-2 bg-danger-light">
+                      {isEditing ? (
+                        <input
+                          value={editLossText}
+                          onChange={(e) => setEditLossText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveEditLoss(i); } if (e.key === "Escape") cancelEditLoss(); }}
+                          autoFocus
+                          className="flex-1 px-2 py-1 rounded-md border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-brand"
+                        />
+                      ) : (
+                        <span className="flex-1 text-sm text-slate-800">{item}</span>
+                      )}
+                      {isEditing ? (
+                        <>
+                          <button type="button" onClick={() => saveEditLoss(i)} className="shrink-0 text-success hover:text-success/80"><Check size={14} /></button>
+                          <button type="button" onClick={cancelEditLoss} className="shrink-0 text-slate-400 hover:text-danger"><X size={14} /></button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => startEditLoss(i)} className="shrink-0 text-slate-400 hover:text-brand-hover"><Pencil size={13} /></button>
+                          <button type="button" onClick={() => handleRemoveLossItem(i)} className="shrink-0 text-slate-400 hover:text-danger"><Trash2 size={14} /></button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             <div className="flex gap-2">
@@ -403,22 +453,43 @@ export default function ReportHarianPanel() {
         <SectionCard title={`Pending (${pendingItems.filter(p => p.status === "pending").length} open)`}>
           {pendingItems.length > 0 && (
             <div className="space-y-1.5 mb-3">
-              {pendingItems.map((p) => (
-                <div key={p.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${p.status === "done" ? "bg-success-light" : "bg-warning-light"}`}>
-                  <button onClick={() => handleTogglePending(p)} className="shrink-0">
-                    {p.status === "done"
-                      ? <CheckCircle2 size={16} className="text-success" />
-                      : <Circle size={16} className="text-warning" />}
-                  </button>
-                  <span className={`flex-1 text-sm ${p.status === "done" ? "line-through text-slate-400" : "text-slate-800"}`}>
-                    {p.product_name}
-                  </span>
-                  <span className="text-[10px] text-slate-400 shrink-0">{p.report_date}</span>
-                  <button onClick={() => handleRemovePending(p.id)} className="shrink-0 text-slate-300 hover:text-danger">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
+              {pendingItems.map((p) => {
+                const isEditing = editingPendingId === p.id;
+                return (
+                  <div key={p.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${p.status === "done" ? "bg-success-light" : "bg-warning-light"}`}>
+                    <button onClick={() => handleTogglePending(p)} className="shrink-0">
+                      {p.status === "done"
+                        ? <CheckCircle2 size={16} className="text-success" />
+                        : <Circle size={16} className="text-warning" />}
+                    </button>
+                    {isEditing ? (
+                      <input
+                        value={editPendingText}
+                        onChange={(e) => setEditPendingText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveEditPending(p.id); } if (e.key === "Escape") cancelEditPending(); }}
+                        autoFocus
+                        className="flex-1 px-2 py-1 rounded-md border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-brand"
+                      />
+                    ) : (
+                      <span className={`flex-1 text-sm ${p.status === "done" ? "line-through text-slate-400" : "text-slate-800"}`}>
+                        {p.product_name}
+                      </span>
+                    )}
+                    {!isEditing && <span className="text-[10px] text-slate-400 shrink-0">{p.report_date}</span>}
+                    {isEditing ? (
+                      <>
+                        <button onClick={() => saveEditPending(p.id)} className="shrink-0 text-success hover:text-success/80"><Check size={14} /></button>
+                        <button onClick={cancelEditPending} className="shrink-0 text-slate-400 hover:text-danger"><X size={14} /></button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => startEditPending(p)} className="shrink-0 text-slate-300 hover:text-brand-hover"><Pencil size={13} /></button>
+                        <button onClick={() => handleRemovePending(p.id)} className="shrink-0 text-slate-300 hover:text-danger"><Trash2 size={14} /></button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           <form onSubmit={handleAddPending} className="flex gap-2">
