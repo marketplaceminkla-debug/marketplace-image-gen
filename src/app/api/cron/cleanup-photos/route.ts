@@ -7,6 +7,9 @@ export const maxDuration = 60;
 
 // Foto hasil generate dihapus setelah lebih tua dari ini.
 const RETENTION_DAYS = 7;
+// Batasi kerja tiap panggilan biar gak kena timeout function kalau foto
+// yang numpuk banyak banget — klien akan manggil ulang kalau masih ada sisa.
+const MAX_DELETES_PER_RUN = 300;
 
 /**
  * Cleanup of generated product photos (bucket: product-photos). Two ways in:
@@ -52,7 +55,8 @@ export async function GET(req: Request) {
     const { data: root, error: rootErr } = await supabase.storage.from(bucket).list("", { limit: 1000 });
     if (rootErr) throw rootErr;
 
-    for (const entry of root ?? []) {
+    let truncated = false;
+    scan: for (const entry of root ?? []) {
       // Folders are returned with id === null; recurse one level into them.
       if (entry.id === null) {
         let offset = 0;
@@ -64,14 +68,20 @@ export async function GET(req: Request) {
           if (!files || files.length === 0) break;
           for (const f of files) {
             const ts = f.created_at ? new Date(f.created_at).getTime() : 0;
-            if (ts < cutoff) toDelete.push(`${entry.name}/${f.name}`);
+            if (ts < cutoff) {
+              toDelete.push(`${entry.name}/${f.name}`);
+              if (toDelete.length >= MAX_DELETES_PER_RUN) { truncated = true; break scan; }
+            }
           }
           if (files.length < 1000) break;
           offset += 1000;
         }
       } else {
         const ts = entry.created_at ? new Date(entry.created_at).getTime() : 0;
-        if (ts < cutoff) toDelete.push(entry.name);
+        if (ts < cutoff) {
+          toDelete.push(entry.name);
+          if (toDelete.length >= MAX_DELETES_PER_RUN) { truncated = true; break scan; }
+        }
       }
     }
 
@@ -83,7 +93,7 @@ export async function GET(req: Request) {
       deleted += batch.length;
     }
 
-    return NextResponse.json({ ok: true, bucket, retentionDays, deleted });
+    return NextResponse.json({ ok: true, bucket, retentionDays, deleted, more: truncated });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : String(err) },

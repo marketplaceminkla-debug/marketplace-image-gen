@@ -116,13 +116,36 @@ export default function UserManagementPanel() {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     if (!token) { setCleanupMsg("Sesi habis, coba login ulang."); setCleaning(false); return; }
+
+    let totalDeleted = 0;
+    let round = 0;
     try {
-      const res = await fetch("/api/cron/cleanup-photos", { headers: { Authorization: `Bearer ${token}` } });
-      const json = await res.json();
-      if (!res.ok || !json.ok) { setCleanupMsg(json.error || "Gagal membersihkan foto."); setCleaning(false); return; }
-      setCleanupMsg(`Selesai! ${json.deleted} foto lama (>${json.retentionDays} hari) dihapus dari storage.`);
-    } catch {
-      setCleanupMsg("Gagal terhubung ke server.");
+      // Server hanya membersihkan sebagian tiap panggilan (biar gak timeout
+      // kalau foto numpuk banyak) — ulangi sampai beneran habis.
+      for (;;) {
+        round++;
+        if (round > 1) setCleanupMsg(`Masih ada sisa, lanjut membersihkan… (${totalDeleted} foto terhapus sejauh ini)`);
+        const res = await fetch("/api/cron/cleanup-photos", { headers: { Authorization: `Bearer ${token}` } });
+        const text = await res.text();
+        let json: { ok?: boolean; error?: string; deleted?: number; retentionDays?: number; more?: boolean };
+        try {
+          json = JSON.parse(text);
+        } catch {
+          setCleanupMsg(`Server error (status ${res.status}): ${text.slice(0, 200) || "respons kosong"}`);
+          setCleaning(false);
+          return;
+        }
+        if (!res.ok || !json.ok) {
+          setCleanupMsg(json.error || `Gagal membersihkan foto (status ${res.status}).`);
+          setCleaning(false);
+          return;
+        }
+        totalDeleted += json.deleted ?? 0;
+        if (!json.more || round >= 30) break;
+      }
+      setCleanupMsg(`Selesai! Total ${totalDeleted} foto lama dihapus dari storage.`);
+    } catch (err) {
+      setCleanupMsg(`Gagal terhubung ke server: ${err instanceof Error ? err.message : String(err)}`);
     }
     setCleaning(false);
   }
