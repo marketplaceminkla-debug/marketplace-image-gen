@@ -49,6 +49,7 @@ body,
 .dark .border-slate-200  { border-color: #322E48; }
 .dark .border-slate-300  { border-color: #423D5E; }
 .dark .border-main-border { border-color: #2E2B44; }
+.dark .border-main-bg { border-color: #14121F; }
 .dark .border-brand-muted { border-color: #5C4D1F; }
 .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2A2740; }
 

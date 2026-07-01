@@ -30,7 +30,8 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { listOrders } from "@/lib/warehouse";
 import { unlockAudio, playChirp } from "@/lib/notifSound";
-import { Bell } from "lucide-react";
+import { AppNotification, listNotifications, getLastSeenAt, markSeenNow, relativeTime } from "@/lib/notifications";
+import { Bell, X } from "lucide-react";
 
 export default function Home() {
   const { session, profile, loading, signOut } = useAuth();
@@ -43,6 +44,14 @@ export default function Home() {
   const notifSeq = useRef(0);
   const knownOrderIds = useRef<Set<string>>(new Set());
   const notifBaseline = useRef(false);
+
+  // Notification center (bell icon): persistent history, separate from the
+  // toast+sound above. Orderan & Product Listing events land here.
+  const [bellItems, setBellItems] = useState<AppNotification[]>([]);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [lastSeenAt, setLastSeenAt] = useState("9999-12-31T00:00:00.000Z"); // nothing "unread" until real value loads post-mount
+  const prevSeenRef = useRef("");
+  const bellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getActiveTemplate().then((t) => setTemplateUploaded(!!t)).catch(() => {});
@@ -145,6 +154,55 @@ export default function Home() {
     return () => { active = false; clearInterval(poll); supabase.removeChannel(channel); };
   }, [canWarehouse, notifyNewOrders]);
 
+  // Notification bell: fetch + poll + realtime for the persistent list.
+  const canProduct = !!profile && (profile.role === "super_admin" || profile.access.includes("product"));
+  useEffect(() => { setLastSeenAt(getLastSeenAt()); }, []);
+  useEffect(() => {
+    if (!canWarehouse && !canProduct) return;
+    let active = true;
+
+    listNotifications().then((rows) => { if (active) setBellItems(rows); });
+    const poll = setInterval(async () => {
+      const rows = await listNotifications();
+      if (active) setBellItems(rows);
+    }, 20000);
+
+    const channel = supabase
+      .channel("app-notif-rt")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload) => {
+        setBellItems((rows) => [payload.new as AppNotification, ...rows].slice(0, 50));
+      })
+      .subscribe();
+
+    return () => { active = false; clearInterval(poll); supabase.removeChannel(channel); };
+  }, [canWarehouse, canProduct]);
+
+  // Close the bell dropdown on outside click.
+  useEffect(() => {
+    if (!bellOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [bellOpen]);
+
+  const unreadCount = bellItems.filter((n) => n.created_at > lastSeenAt).length;
+  function toggleBell() {
+    setBellOpen((open) => {
+      const next = !open;
+      if (next) {
+        prevSeenRef.current = lastSeenAt;
+        setLastSeenAt(markSeenNow());
+      }
+      return next;
+    });
+  }
+  function handleNotifClick(n: AppNotification) {
+    handleViewChange(n.target_view as ViewId);
+    setBellOpen(false);
+  }
+
   // ── Auth gates ──
   if (loading) {
     return (
@@ -215,11 +273,65 @@ export default function Home() {
     }
   }
 
+  const warehouseNotifs = bellItems.filter((n) => n.category === "warehouse");
+  const productNotifs = bellItems.filter((n) => n.category === "product");
+
   return (
     <div className="flex flex-col md:flex-row h-screen bg-main-bg overflow-hidden">
+      {/* Notification bell: persistent history, separated by section */}
+      {(canWarehouse || canProduct) && (
+        <div ref={bellRef} className="fixed top-3 right-3 md:top-4 md:right-4 z-[280]">
+          <button
+            onClick={toggleBell}
+            title="Notifikasi"
+            className="relative w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-white/20 hover:border-brand/60 transition-colors"
+            style={{ background: "#2D1B69" }}
+          >
+            <Bell size={17} style={{ color: "#F5C200" }} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center border-2 border-main-bg">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {bellOpen && (
+            <div className="absolute right-0 mt-2 w-[92vw] max-w-sm max-h-[70vh] overflow-y-auto rounded-2xl shadow-xl bg-white border border-slate-200 animate-fade-in">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white">
+                <p className="text-sm font-bold text-slate-900">Notifikasi</p>
+                <button onClick={() => setBellOpen(false)} className="text-slate-400 hover:text-slate-700"><X size={16} /></button>
+              </div>
+
+              {bellItems.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-10">Belum ada notifikasi.</p>
+              ) : (
+                <>
+                  {warehouseNotifs.length > 0 && (
+                    <div className="pb-1">
+                      <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Orderan Gudang</p>
+                      {warehouseNotifs.map((n) => (
+                        <NotifRow key={n.id} n={n} unread={n.created_at > prevSeenRef.current} onClick={() => handleNotifClick(n)} />
+                      ))}
+                    </div>
+                  )}
+                  {productNotifs.length > 0 && (
+                    <div className="pb-1">
+                      <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Product Listing</p>
+                      {productNotifs.map((n) => (
+                        <NotifRow key={n.id} n={n} unread={n.created_at > prevSeenRef.current} onClick={() => handleNotifClick(n)} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Realtime notifications */}
       {notifs.length > 0 && (
-        <div className="fixed top-4 right-4 z-[300] space-y-2 w-[min(88vw,320px)]">
+        <div className="fixed top-16 right-3 md:top-20 md:right-4 z-[300] space-y-2 w-[min(88vw,320px)]">
           {notifs.map((n) => (
             <button
               key={n.id}
@@ -241,8 +353,8 @@ export default function Home() {
 
       <WorkspaceSidebar sections={visibleSections} activeView={view} onViewChange={handleViewChange} templateUploaded={templateUploaded} />
       <main className="flex-1 flex flex-col overflow-hidden pb-[60px] md:pb-0">
-        {/* Mobile sub-nav: items of the active section + logout */}
-        <div className="md:hidden flex items-center gap-1.5 px-3 py-2 border-b border-slate-200 bg-white shrink-0">
+        {/* Mobile sub-nav: items of the active section + logout (pr-12 clears the fixed bell) */}
+        <div className="md:hidden flex items-center gap-1.5 pl-3 pr-12 py-2 border-b border-slate-200 bg-white shrink-0">
           <div className="flex-1 flex gap-1.5 overflow-x-auto scrollbar-thin">
             {activeSection.items.map((item) => {
               const isActive = view === item.id;
@@ -269,5 +381,21 @@ export default function Home() {
         </div>
       </main>
     </div>
+  );
+}
+
+function NotifRow({ n, unread, onClick }: { n: AppNotification; unread: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full flex items-start gap-2 text-left px-4 py-2.5 hover:bg-slate-50 transition-colors">
+      <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${unread ? "bg-brand" : "bg-transparent"}`} />
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-slate-900 truncate">{n.title}</span>
+          <span className="text-[10px] text-slate-400 shrink-0">{relativeTime(n.created_at)}</span>
+        </span>
+        {n.body && <span className="block text-xs text-slate-500 mt-0.5 truncate">{n.body}</span>}
+        {n.actor_name && <span className="block text-[10px] text-slate-400 mt-0.5">oleh {n.actor_name}</span>}
+      </span>
+    </button>
   );
 }
