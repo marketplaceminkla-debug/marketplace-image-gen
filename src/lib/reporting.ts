@@ -76,6 +76,23 @@ export function storeReportLabel(s: StoreAccount): string {
   return cat ?? s.name;
 }
 
+// Fixed header wording per PIC (as dictated by the owner) — combines their
+// store names into one line, e.g. "Shopee GADGET KLIK & LENOVO" for Alfin.
+const PIC_REPORT_HEADERS: Record<string, string> = {
+  Alfin: "Shopee GADGET KLIK & LENOVO",
+  Diza: "Shopee KLA Aksesoris & Tokped KLA",
+  Rona: "Shopee KLA",
+};
+
+/** Header line for a PIC's combined WA report (store names, not the person's name). */
+export function picReportHeader(picName: string, stores: StoreAccount[]): string {
+  if (PIC_REPORT_HEADERS[picName]) return PIC_REPORT_HEADERS[picName];
+  const labels = stores.filter((s) => s.pic_name === picName).map((s) => storeReportLabel(s));
+  const unique: string[] = [];
+  labels.forEach((l) => { if (!unique.includes(l)) unique.push(l); });
+  return unique.length ? unique.join(" & ") : picName;
+}
+
 export function formatIDR(n: number): string {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
@@ -333,6 +350,7 @@ export function buildReportWaMessage(
 /** Build WA report for a PIC (aggregates all their stores). */
 export function buildPicWaMessage(
   picName: string,
+  stores: StoreAccount[],
   report: DailySalesReport | null,
   autoData: { revenue_today: number; revenue_total: number; revenue_estimate: number; deal_qty: number; kombo_garansi: number; kombo_non_garansi: number; deals: { name: string; qty: number }[] },
   pendingItems: PendingItem[],
@@ -344,6 +362,7 @@ export function buildPicWaMessage(
 ): string {
   const [y, m, d] = date.split("-");
   const dateStr = `${d}/${m}/${y}`;
+  const header = picReportHeader(picName, stores);
   const dealLines = autoData.deals.length
     ? autoData.deals.map((dd) => `${dd.qty} unit\t${dd.name}`).join("\n")
     : "-";
@@ -352,7 +371,7 @@ export function buildPicWaMessage(
     ? openPending.map((p, i) => `${i + 1}. ${p.product_name}`).join("\n")
     : "-";
   return (
-    `Report ${picName} ${dateStr}\n\n` +
+    `Report ${header} ${dateStr}\n\n` +
     `TARGET : ${formatIDR(target)}\n` +
     `Total Revenue : ${formatIDR(autoData.revenue_total)}\n` +
     `Revenue Hari Ini : ${formatIDR(autoData.revenue_today)}\n` +

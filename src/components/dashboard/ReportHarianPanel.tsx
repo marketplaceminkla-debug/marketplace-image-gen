@@ -182,6 +182,7 @@ export default function ReportHarianPanel() {
     }
     const text = buildPicWaMessage(
       picName,
+      stores,
       report,
       autoData,
       pendingItems,
