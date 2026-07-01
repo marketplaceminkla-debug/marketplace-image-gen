@@ -271,14 +271,14 @@ export default function ReportHarianPanel() {
         </SectionCard>
 
         {/* AUTO DATA dari Multiwarehouse */}
-        <div className="bg-white rounded-2xl border border-brand-muted shadow-sm p-4 mb-4">
+        <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-sm p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Zap size={14} className="text-brand-hover" />
-              <h3 className="text-xs font-semibold text-brand-hover uppercase tracking-wide">Auto dari Multiwarehouse</h3>
+              <Zap size={14} className="text-brand" />
+              <h3 className="text-xs font-semibold text-brand uppercase tracking-wide">Auto dari Multiwarehouse</h3>
             </div>
             <button onClick={handleRefreshAuto} disabled={loadingAuto}
-              className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-brand-hover">
+              className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-white">
               {loadingAuto ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Refresh
             </button>
           </div>
@@ -297,7 +297,7 @@ export default function ReportHarianPanel() {
 
               {target > 0 && autoData.revenue_total > 0 && (
                 <div className="mb-3">
-                  <div className="flex justify-between text-[11px] text-slate-500 mb-1">
+                  <div className="flex justify-between text-[11px] text-slate-400 mb-1">
                     <span>Progress ke target</span>
                     <span className="font-semibold">{Math.min(100, (autoData.revenue_total / target * 100)).toFixed(1)}%</span>
                   </div>
@@ -317,9 +317,9 @@ export default function ReportHarianPanel() {
                 <div className="space-y-1 mt-2">
                   <p className="text-[11px] text-slate-400 font-medium">Detail deal hari ini:</p>
                   {autoData.deals.map((d, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-1.5">
-                      <span className="shrink-0 text-xs font-bold text-brand-hover w-12">{d.qty} unit</span>
-                      <span className="text-sm text-slate-700">{d.name}</span>
+                    <div key={i} className="flex items-center gap-2 bg-slate-700 rounded-lg px-3 py-1.5">
+                      <span className="shrink-0 text-xs font-bold text-brand w-12">{d.qty} unit</span>
+                      <span className="text-sm text-slate-200">{d.name}</span>
                     </div>
                   ))}
                 </div>
@@ -456,9 +456,9 @@ function Labeled({ label, children }: { label: string; children: React.ReactNode
 
 function AutoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-brand-light rounded-xl border border-brand-muted p-3 text-center">
-      <p className="text-xs text-slate-500 mb-1">{label}</p>
-      <p className="text-sm font-bold text-slate-900 leading-tight">{value}</p>
+    <div className="bg-slate-800 rounded-xl border border-slate-700 p-3 text-center">
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      <p className="text-sm font-bold text-white leading-tight">{value}</p>
     </div>
   );
 }

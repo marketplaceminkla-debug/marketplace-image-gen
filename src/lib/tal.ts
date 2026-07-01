@@ -8,6 +8,7 @@ export interface TalItem {
   title: string;
   category: TalCategory;
   is_done: boolean;
+  pic_name: string | null; // 'Rona' | 'Diza' | 'Alfin' | 'Mauren' | null
   created_at: string;
 }
 
@@ -35,7 +36,13 @@ export async function listTalItems(): Promise<TalItem[]> {
   return data as TalItem[];
 }
 
-export async function addTalItem(input: { month: string; title: string; category: TalCategory; created_by: string | null }) {
+export async function addTalItem(input: {
+  month: string;
+  title: string;
+  category: TalCategory;
+  pic_name: string | null;
+  created_by: string | null;
+}) {
   const { error } = await supabase.from("tal_items").insert(input);
   return { error: error ? error.message : null };
 }

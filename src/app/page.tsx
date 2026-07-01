@@ -18,6 +18,7 @@ import PriceUpdatePanel from "@/components/products/PriceUpdatePanel";
 import FeeDatabasePanel from "@/components/products/FeeDatabasePanel";
 import SkuReplacementPanel from "@/components/products/SkuReplacementPanel";
 import TalPanel from "@/components/dashboard/TalPanel";
+import KpiTimPanel from "@/components/dashboard/KpiTimPanel";
 import ReportHarianPanel from "@/components/dashboard/ReportHarianPanel";
 import MonitoringPanel from "@/components/dashboard/MonitoringPanel";
 import WarehouseOrdersPanel from "@/components/warehouse/WarehouseOrdersPanel";
@@ -189,6 +190,8 @@ export default function Home() {
         return <RevenuePanel />;
       case "dash-tal":
         return <TalPanel />;
+      case "dash-kpi":
+        return <KpiTimPanel />;
       case "dash-report":
         return <ReportHarianPanel />;
       case "dash-monitoring":
