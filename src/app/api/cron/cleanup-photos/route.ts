@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabase, PRODUCT_PHOTOS_BUCKET } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,16 @@ export async function GET(req: Request) {
 
   let authorized = !!secret && provided === secret;
   if (!authorized && provided) {
-    const { data: userRes } = await supabase.auth.getUser(provided);
+    // Query as the caller (not the shared anon client) so the profiles RLS
+    // policy (`id = auth.uid() or is_super_admin()`) actually resolves.
+    const callerClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${provided}` } } }
+    );
+    const { data: userRes } = await callerClient.auth.getUser(provided);
     if (userRes?.user) {
-      const { data: prof } = await supabase.from("profiles").select("role").eq("id", userRes.user.id).single();
+      const { data: prof } = await callerClient.from("profiles").select("role").eq("id", userRes.user.id).single();
       authorized = prof?.role === "super_admin";
     }
   }
