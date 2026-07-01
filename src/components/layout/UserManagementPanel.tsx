@@ -141,7 +141,7 @@ export default function UserManagementPanel() {
           return;
         }
         totalDeleted += json.deleted ?? 0;
-        if (!json.more || round >= 30) break;
+        if (!json.more || round >= 500) break;
       }
       setCleanupMsg(`Selesai! Total ${totalDeleted} foto lama dihapus dari storage.`);
     } catch (err) {
