@@ -128,6 +128,21 @@ export default function WarehouseOrdersPanel() {
   }, [fetchData]);
 
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
+  // Restricted accounts (e.g. intern handling one branch) only get that
+  // branch in the "Gudang tujuan" picker — RLS enforces this server-side too.
+  const scope = profile?.warehouse_scope ?? [];
+  const scopedWarehouses = useMemo(
+    () => (scope.length ? warehouses.filter((w) => scope.includes(w.id)) : warehouses),
+    [warehouses, scope]
+  );
+  // Keep the "Gudang tujuan" default valid for restricted accounts (the
+  // initial default picks the first warehouse overall, which a scoped
+  // account may not be allowed to use).
+  useEffect(() => {
+    if (scopedWarehouses.length && !scopedWarehouses.some((w) => w.id === warehouseId)) {
+      setWarehouseId(scopedWarehouses[0].id);
+    }
+  }, [scopedWarehouses, warehouseId]);
   const shown = useMemo(() => orders.filter((o) => {
     if (filter !== "all" && o.status !== filter) return false;
     if (ekspFilter !== "all" && o.ekspedisi !== ekspFilter) return false;
@@ -337,7 +352,7 @@ export default function WarehouseOrdersPanel() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 <Labeled label="Gudang tujuan">
                   <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={INPUT}>
-                    {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    {scopedWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
                 </Labeled>
                 <Labeled label="Tanggal">

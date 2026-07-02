@@ -52,6 +52,9 @@ export async function POST(req: Request) {
   const fullName = String(body.fullName || "").trim();
   const role = VALID_ROLES.includes(body.role) ? body.role : "staff";
   const access = Array.isArray(body.access) ? body.access.filter((a: unknown) => VALID_SECTIONS.includes(String(a))) : [];
+  const warehouseScope = Array.isArray(body.warehouseScope)
+    ? body.warehouseScope.filter((w: unknown) => typeof w === "string" && w.length > 0)
+    : [];
 
   if (!email || !fullName) {
     return NextResponse.json({ error: "Email dan nama wajib diisi." }, { status: 400 });
@@ -77,7 +80,7 @@ export async function POST(req: Request) {
   for (let i = 0; i < 5; i++) {
     const { error } = await admin
       .from("profiles")
-      .update({ role, access, is_active: true, full_name: fullName })
+      .update({ role, access, warehouse_scope: warehouseScope, is_active: true, full_name: fullName })
       .eq("id", created.user.id);
     profileError = error?.message ?? null;
     if (!error) break;

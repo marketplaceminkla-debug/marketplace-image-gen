@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Users, RefreshCw, Loader2, Check, UserPlus, Copy, X, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, type Profile, type Role } from "@/lib/auth";
+import { listWarehouses, type Warehouse } from "@/lib/warehouse";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard" },
@@ -19,6 +20,7 @@ interface CreatedAccount { email: string; password: string; }
 export default function UserManagementPanel() {
   const { profile: me } = useAuth();
   const [rows, setRows] = useState<Profile[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +31,7 @@ export default function UserManagementPanel() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<Role>("staff");
   const [newAccess, setNewAccess] = useState<string[]>([]);
+  const [newWarehouseScope, setNewWarehouseScope] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createdAccount, setCreatedAccount] = useState<CreatedAccount | null>(null);
@@ -51,6 +54,7 @@ export default function UserManagementPanel() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { listWarehouses().then(setWarehouses); }, []);
 
   async function update(id: string, patch: Partial<Profile>) {
     setSavingId(id);
@@ -68,12 +72,23 @@ export default function UserManagementPanel() {
     update(row.id, { access });
   }
 
+  function toggleWarehouseScope(row: Profile, whId: string) {
+    const scope = row.warehouse_scope ?? [];
+    const has = scope.includes(whId);
+    const warehouse_scope = has ? scope.filter((w) => w !== whId) : [...scope, whId];
+    update(row.id, { warehouse_scope });
+  }
+
   function toggleNewAccess(sectionId: string) {
     setNewAccess((a) => (a.includes(sectionId) ? a.filter((x) => x !== sectionId) : [...a, sectionId]));
   }
 
+  function toggleNewWarehouseScope(whId: string) {
+    setNewWarehouseScope((a) => (a.includes(whId) ? a.filter((x) => x !== whId) : [...a, whId]));
+  }
+
   function resetAddForm() {
-    setNewFullName(""); setNewEmail(""); setNewRole("staff"); setNewAccess([]); setCreateError(null);
+    setNewFullName(""); setNewEmail(""); setNewRole("staff"); setNewAccess([]); setNewWarehouseScope([]); setCreateError(null);
   }
 
   async function handleCreateAccount(e: React.FormEvent) {
@@ -89,7 +104,10 @@ export default function UserManagementPanel() {
       const res = await fetch("/api/admin/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ fullName: newFullName.trim(), email: newEmail.trim(), role: newRole, access: newAccess }),
+        body: JSON.stringify({
+          fullName: newFullName.trim(), email: newEmail.trim(), role: newRole, access: newAccess,
+          warehouseScope: newAccess.includes("warehouse") ? newWarehouseScope : [],
+        }),
       });
       const json = await res.json();
       if (!res.ok) { setCreateError(json.error || "Gagal bikin akun."); setCreating(false); return; }
@@ -252,6 +270,31 @@ export default function UserManagementPanel() {
                 </div>
               </div>
             )}
+            {newRole !== "super_admin" && newAccess.includes("warehouse") && warehouses.length > 0 && (
+              <div className="mt-2.5">
+                <label className="text-[11px] text-slate-500">Cabang gudang (kosongkan = semua cabang)</label>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {warehouses.map((w) => {
+                    const checked = newWarehouseScope.includes(w.id);
+                    return (
+                      <button
+                        type="button"
+                        key={w.id}
+                        onClick={() => toggleNewWarehouseScope(w.id)}
+                        className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          checked ? "bg-brand-light text-brand-hover border-brand-muted" : "bg-white text-slate-500 border-slate-200"
+                        }`}
+                      >
+                        <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${checked ? "bg-brand" : "bg-slate-200"}`}>
+                          {checked && <Check size={10} className="text-slate-900" />}
+                        </span>
+                        {w.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <p className="text-[11px] text-slate-400 mt-2.5">Password digenerate otomatis dan cuma ditampilkan sekali — akun langsung aktif, gak perlu approve lagi.</p>
             <button type="submit" disabled={creating}
               className="btn-bounce mt-3 px-4 py-2 rounded-lg bg-brand hover:bg-brand-hover text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
@@ -338,6 +381,34 @@ export default function UserManagementPanel() {
                       )}
                     </div>
                   </div>
+
+                  {/* Warehouse scope — only relevant when the account has Multiwarehouse access */}
+                  {row.role !== "super_admin" && row.access.includes("warehouse") && warehouses.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Cabang gudang (kosongkan = semua cabang)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {warehouses.map((w) => {
+                          const checked = (row.warehouse_scope ?? []).includes(w.id);
+                          return (
+                            <button
+                              key={w.id}
+                              onClick={() => toggleWarehouseScope(row, w.id)}
+                              className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                                checked
+                                  ? "bg-brand-light text-brand-hover border-brand-muted"
+                                  : "bg-white text-slate-500 border-slate-200"
+                              }`}
+                            >
+                              <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${checked ? "bg-brand" : "bg-slate-200"}`}>
+                                {checked && <Check size={10} className="text-slate-900" />}
+                              </span>
+                              {w.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

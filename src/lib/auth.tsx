@@ -12,6 +12,7 @@ export interface Profile {
   full_name: string | null;
   role: Role;
   access: string[]; // section ids: "dashboard" | "product" | "tools"
+  warehouse_scope: string[]; // warehouse ids this account is restricted to; empty = all
   is_active: boolean;
 }
 
