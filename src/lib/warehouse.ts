@@ -1,5 +1,17 @@
 import { supabase, WAREHOUSE_RESI_BUCKET } from "./supabase";
 
+// Nomor SO mask: SO/#####/###### (5 digits then 6 digits) — shared by
+// Orderan Gudang and Stock Management (Retur & Gagal Kirim), since both
+// reference the same Shopee/marketplace SO numbers.
+export const SO_RE = /^SO\/\d{5}\/\d{6}$/;
+export function formatSo(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 11);
+  if (!d) return "";
+  let out = "SO/" + d.slice(0, 5);
+  if (d.length > 5) out += "/" + d.slice(5, 11);
+  return out;
+}
+
 export type Ekspedisi = "instan" | "reguler";
 export type Shipment = "dropoff" | "pickup";
 export type OrderStatus = "new" | "process" | "approved" | "denied" | "done";

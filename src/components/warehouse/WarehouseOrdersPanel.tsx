@@ -7,20 +7,11 @@ import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
   STATUS_LABEL, EKSPEDISI_LABEL, SHIPMENT_LABEL, orderItems,
   listWarehouses, listOrders, addOrder, updateOrder, deleteOrder, waLink, uploadResi,
+  SO_RE, formatSo,
 } from "@/lib/warehouse";
 import { StoreAccount, listStoreAccounts, storeDisplayName } from "@/lib/reporting";
 
 const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
-
-// Nomor SO mask: SO/#####/###### (5 digits then 6 digits)
-const SO_RE = /^SO\/\d{5}\/\d{6}$/;
-function formatSo(raw: string): string {
-  const d = raw.replace(/\D/g, "").slice(0, 11);
-  if (!d) return "";
-  let out = "SO/" + d.slice(0, 5);
-  if (d.length > 5) out += "/" + d.slice(5, 11);
-  return out;
-}
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   new: "bg-slate-100 text-slate-500 border-slate-200",

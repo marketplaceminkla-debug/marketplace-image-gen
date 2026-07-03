@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Gauge, TrendingUp, ListChecks,
   Boxes, PackagePlus, Tag, Percent, ArrowLeftRight,
-  Warehouse, ClipboardList, Building2,
+  Warehouse, ClipboardList, Building2, PackageX,
   Wrench, LayoutTemplate, FileSpreadsheet, Zap, PackageOpen,
   ShieldCheck, Users, FileText, BarChart2, Award,
   type LucideIcon,
@@ -11,6 +11,7 @@ export type ViewId =
   | "dash-overview" | "dash-revenue" | "dash-tal" | "dash-kpi" | "dash-report" | "dash-monitoring"
   | "prod-new" | "prod-price" | "prod-fee" | "prod-sku"
   | "wh-orders" | "wh-list"
+  | "stock-returns"
   | "ps-template" | "ps-import" | "ps-generate" | "ps-shopee" | "ps-ziptoshopee"
   | "admin-users";
 
@@ -63,6 +64,14 @@ export const NAV: NavSection[] = [
     items: [
       { id: "wh-orders", label: "Orderan", shortLabel: "Order", description: "List order + kirim WA", icon: ClipboardList },
       { id: "wh-list", label: "Database Gudang", shortLabel: "Gudang", description: "Nomor WA cabang", icon: Building2 },
+    ],
+  },
+  {
+    id: "stock",
+    label: "Stock Management",
+    icon: PackageX,
+    items: [
+      { id: "stock-returns", label: "Retur & Gagal Kirim", shortLabel: "Retur", description: "Retur & pengiriman gagal", icon: PackageX },
     ],
   },
   {

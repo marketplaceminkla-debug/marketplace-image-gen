@@ -23,6 +23,7 @@ import ReportHarianPanel from "@/components/dashboard/ReportHarianPanel";
 import MonitoringPanel from "@/components/dashboard/MonitoringPanel";
 import WarehouseOrdersPanel from "@/components/warehouse/WarehouseOrdersPanel";
 import WarehouseDbPanel from "@/components/warehouse/WarehouseDbPanel";
+import StockReturnsPanel from "@/components/stock/StockReturnsPanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
@@ -270,6 +271,10 @@ export default function Home() {
         return <WarehouseOrdersPanel />;
       case "wh-list":
         return <WarehouseDbPanel />;
+
+      // ── Stock Management ──
+      case "stock-returns":
+        return <StockReturnsPanel />;
     }
   }
 

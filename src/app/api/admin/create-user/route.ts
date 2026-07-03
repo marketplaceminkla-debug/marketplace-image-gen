@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 
 const VALID_ROLES = ["staff", "admin", "super_admin"];
-const VALID_SECTIONS = ["dashboard", "product", "warehouse", "tools"];
+const VALID_SECTIONS = ["dashboard", "product", "warehouse", "stock", "tools"];
 
 function randomPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";

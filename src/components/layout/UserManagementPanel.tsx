@@ -10,6 +10,7 @@ const SECTIONS = [
   { id: "dashboard", label: "Dashboard" },
   { id: "product", label: "Product Listing" },
   { id: "warehouse", label: "Multiwarehouse" },
+  { id: "stock", label: "Stock Management" },
   { id: "tools", label: "Tools" },
 ];
 
@@ -106,7 +107,7 @@ export default function UserManagementPanel() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           fullName: newFullName.trim(), email: newEmail.trim(), role: newRole, access: newAccess,
-          warehouseScope: newAccess.includes("warehouse") ? newWarehouseScope : [],
+          warehouseScope: (newAccess.includes("warehouse") || newAccess.includes("stock")) ? newWarehouseScope : [],
         }),
       });
       const json = await res.json();
@@ -270,7 +271,7 @@ export default function UserManagementPanel() {
                 </div>
               </div>
             )}
-            {newRole !== "super_admin" && newAccess.includes("warehouse") && warehouses.length > 0 && (
+            {newRole !== "super_admin" && (newAccess.includes("warehouse") || newAccess.includes("stock")) && warehouses.length > 0 && (
               <div className="mt-2.5">
                 <label className="text-[11px] text-slate-500">Cabang gudang (kosongkan = semua cabang)</label>
                 <div className="mt-1 flex flex-wrap gap-2">
@@ -382,8 +383,8 @@ export default function UserManagementPanel() {
                     </div>
                   </div>
 
-                  {/* Warehouse scope — only relevant when the account has Multiwarehouse access */}
-                  {row.role !== "super_admin" && row.access.includes("warehouse") && warehouses.length > 0 && (
+                  {/* Warehouse scope — relevant when the account has Multiwarehouse or Stock Management access */}
+                  {row.role !== "super_admin" && (row.access.includes("warehouse") || row.access.includes("stock")) && warehouses.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Cabang gudang (kosongkan = semua cabang)</p>
                       <div className="flex flex-wrap gap-2">
