@@ -8,7 +8,9 @@ export interface TalItem {
   title: string;
   category: TalCategory;
   is_done: boolean;
-  pic_name: string | null; // 'Rona' | 'Diza' | 'Alfin' | 'Mauren' | null
+  pic_name: string | null;
+  proof_url: string | null;
+  proof_name: string | null;
   created_at: string;
 }
 
@@ -55,4 +57,19 @@ export async function updateTalItem(id: string, patch: Partial<TalItem>) {
 export async function deleteTalItem(id: string) {
   const { error } = await supabase.from("tal_items").delete().eq("id", id);
   return { error: error ? error.message : null };
+}
+
+export async function uploadTalProof(
+  file: File,
+): Promise<{ url: string | null; name: string | null; error: string | null }> {
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from("tal-proof").upload(path, file, {
+    cacheControl: "31536000",
+    upsert: true,
+    contentType: file.type || undefined,
+  });
+  if (error) return { url: null, name: null, error: error.message };
+  const { data } = supabase.storage.from("tal-proof").getPublicUrl(path);
+  return { url: data.publicUrl, name: file.name, error: null };
 }
