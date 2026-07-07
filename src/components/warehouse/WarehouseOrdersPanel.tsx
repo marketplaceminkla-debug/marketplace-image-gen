@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
@@ -39,8 +39,10 @@ export default function WarehouseOrdersPanel() {
   const [orders, setOrders] = useState<WarehouseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | OrderStatus>("all");
-  const [ekspFilter, setEkspFilter] = useState<"all" | Ekspedisi>("all");
+  const [statusFilter, setStatusFilter] = useState<Set<OrderStatus>>(new Set());
+  const [ekspFilter, setEkspFilter] = useState<Set<Ekspedisi>>(new Set());
+  const [warehouseFilter, setWarehouseFilter] = useState<Set<string>>(new Set());
+  const [storeFilter, setStoreFilter] = useState<Set<string>>(new Set());
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -135,12 +137,14 @@ export default function WarehouseOrdersPanel() {
     }
   }, [scopedWarehouses, warehouseId]);
   const shown = useMemo(() => orders.filter((o) => {
-    if (filter !== "all" && o.status !== filter) return false;
-    if (ekspFilter !== "all" && o.ekspedisi !== ekspFilter) return false;
+    if (statusFilter.size && !statusFilter.has(o.status)) return false;
+    if (ekspFilter.size && !ekspFilter.has(o.ekspedisi)) return false;
+    if (warehouseFilter.size && !warehouseFilter.has(o.warehouse_id)) return false;
+    if (storeFilter.size && !(o.store_account_id && storeFilter.has(o.store_account_id))) return false;
     if (fromDate && (o.order_date ?? "") < fromDate) return false;
     if (toDate && (o.order_date ?? "") > toDate) return false;
     return true;
-  }), [orders, filter, ekspFilter, fromDate, toDate]);
+  }), [orders, statusFilter, ekspFilter, warehouseFilter, storeFilter, fromDate, toDate]);
 
   // Group by warehouse, then split by ekspedisi (Instan first as priority) so
   // each branch+priority gets its own combined send.
@@ -434,29 +438,48 @@ export default function WarehouseOrdersPanel() {
               </button>
             </form>
 
-            {/* Filter */}
+            {/* Filters — multi-select dropdowns */}
             <div className="flex items-center gap-1.5 flex-wrap mb-3">
-              {(["all", ...STATUSES] as const).map((f) => {
-                const count = f === "all" ? orders.length : orders.filter((o) => o.status === f).length;
-                return (
-                  <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${filter === f ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
-                    {f === "all" ? "Semua" : STATUS_LABEL[f]} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Ekspedisi filter */}
-            <div className="flex items-center gap-1.5 flex-wrap mb-3">
-              {(["all", "instan", "reguler"] as const).map((f) => {
-                const count = f === "all" ? orders.length : orders.filter((o) => o.ekspedisi === f).length;
-                const label = f === "all" ? "Semua ekspedisi" : f === "instan" ? "⚡ Instan" : "Reguler";
-                return (
-                  <button key={f} onClick={() => setEkspFilter(f)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${ekspFilter === f ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
-                    {label} ({count})
-                  </button>
-                );
-              })}
+              <MultiSelectFilter
+                label="Status"
+                selected={statusFilter}
+                onChange={setStatusFilter}
+                options={STATUSES.map((s) => ({
+                  value: s,
+                  label: STATUS_LABEL[s],
+                  count: orders.filter((o) => o.status === s).length,
+                }))}
+              />
+              <MultiSelectFilter
+                label="Ekspedisi"
+                selected={ekspFilter}
+                onChange={setEkspFilter}
+                options={(["instan", "reguler"] as Ekspedisi[]).map((e) => ({
+                  value: e,
+                  label: EKSPEDISI_LABEL[e],
+                  count: orders.filter((o) => o.ekspedisi === e).length,
+                }))}
+              />
+              <MultiSelectFilter
+                label="Gudang Tujuan"
+                selected={warehouseFilter}
+                onChange={setWarehouseFilter}
+                options={warehouses.map((w) => ({
+                  value: w.id,
+                  label: w.name,
+                  count: orders.filter((o) => o.warehouse_id === w.id).length,
+                }))}
+              />
+              <MultiSelectFilter
+                label="Platform / Toko"
+                selected={storeFilter}
+                onChange={setStoreFilter}
+                options={storeAccounts.map((s) => ({
+                  value: s.id,
+                  label: storeDisplayName(s),
+                  count: orders.filter((o) => o.store_account_id === s.id).length,
+                }))}
+              />
             </div>
 
             {/* Date filter */}
@@ -681,6 +704,87 @@ function Labeled({ label, children }: { label: string; children: React.ReactNode
     <div>
       <label className="text-[11px] text-slate-500">{label}</label>
       <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
+interface MultiSelectOption<T extends string> { value: T; label: string; count: number; }
+
+function MultiSelectFilter<T extends string>({
+  label, options, selected, onChange,
+}: {
+  label: string;
+  options: MultiSelectOption<T>[];
+  selected: Set<T>;
+  onChange: (next: Set<T>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  function toggle(v: T) {
+    const next = new Set(selected);
+    next.has(v) ? next.delete(v) : next.add(v);
+    onChange(next);
+  }
+
+  const summary = selected.size === 0
+    ? "Semua"
+    : selected.size === 1
+      ? (options.find((o) => o.value === Array.from(selected)[0])?.label ?? "1 dipilih")
+      : `${selected.size} dipilih`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selected.size ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}
+      >
+        {label}: {summary}
+        <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 z-20 mt-1.5 min-w-[200px] max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange(new Set())}
+              className="w-full text-left px-3 py-1.5 text-xs text-brand-hover hover:bg-slate-50 font-medium border-b border-slate-100 mb-1"
+            >
+              Reset (semua)
+            </button>
+          )}
+          {options.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-400">Tidak ada opsi.</p>
+          ) : (
+            options.map((o) => {
+              const checked = selected.has(o.value);
+              return (
+                <button
+                  type="button"
+                  key={o.value}
+                  onClick={() => toggle(o.value)}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 text-left"
+                >
+                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${checked ? "bg-brand border-brand" : "border-slate-300"}`}>
+                    {checked && <Check size={10} className="text-slate-900" />}
+                  </span>
+                  <span className="flex-1 truncate">{o.label}</span>
+                  <span className="text-slate-400 shrink-0">({o.count})</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }
