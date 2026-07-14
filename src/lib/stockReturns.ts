@@ -23,8 +23,10 @@ export interface StockReturn {
   return_date: string; // YYYY-MM-DD
   so_number: string | null;
   order_number: string | null;
-  item_name: string;
+  item_name: string | null; // legacy fallback for the first item
   qty: number;
+  items: string[];
+  item_qtys: number[];
   warehouse_id: string | null;
   category: ReturnCategory;
   reason: string | null;
@@ -32,6 +34,15 @@ export interface StockReturn {
   status: ReturnStatus;
   created_by: string | null;
   created_at: string;
+}
+
+export interface ReturnItem { name: string; qty: number; }
+
+/** Items of a return (name + qty), falling back to the legacy single item_name. */
+export function returnItems(r: StockReturn): ReturnItem[] {
+  const names = r.items && r.items.length ? r.items : r.item_name ? [r.item_name] : [];
+  const qtys = r.item_qtys ?? [];
+  return names.map((name, i) => ({ name, qty: qtys[i] ?? 1 }));
 }
 
 export async function listStockReturns(): Promise<StockReturn[]> {
@@ -48,15 +59,19 @@ export async function addStockReturn(input: {
   return_date: string;
   so_number: string | null;
   order_number: string | null;
-  item_name: string;
-  qty: number;
+  items: string[];
+  item_qtys: number[];
   warehouse_id: string | null;
   category: ReturnCategory;
   reason: string | null;
   proof_url: string | null;
   created_by: string | null;
 }) {
-  const { error } = await supabase.from("stock_returns").insert(input);
+  const { error } = await supabase.from("stock_returns").insert({
+    ...input,
+    item_name: input.items[0] ?? null,
+    qty: input.item_qtys[0] ?? 1,
+  });
   return { error: error ? error.message : null };
 }
 

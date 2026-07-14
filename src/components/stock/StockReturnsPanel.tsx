@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { Warehouse, listWarehouses, SO_RE, formatSo } from "@/lib/warehouse";
 import {
   StockReturn, ReturnCategory, ReturnStatus,
-  CATEGORY_LABEL, STATUS_LABEL,
+  CATEGORY_LABEL, STATUS_LABEL, returnItems,
   listStockReturns, addStockReturn, updateStockReturn, deleteStockReturn,
 } from "@/lib/stockReturns";
 
@@ -41,8 +41,7 @@ export default function StockReturnsPanel() {
   const [returnDate, setReturnDate] = useState(todayISO());
   const [so, setSo] = useState("");
   const [orderNo, setOrderNo] = useState("");
-  const [itemName, setItemName] = useState("");
-  const [qty, setQty] = useState(1);
+  const [items, setItems] = useState<{ name: string; qty: number }[]>([{ name: "", qty: 1 }]);
   const [warehouseId, setWarehouseId] = useState("");
   const [category, setCategory] = useState<ReturnCategory>("tukar_unit");
   const [reason, setReason] = useState("");
@@ -54,8 +53,7 @@ export default function StockReturnsPanel() {
   const [editDate, setEditDate] = useState("");
   const [editSo, setEditSo] = useState("");
   const [editOrderNo, setEditOrderNo] = useState("");
-  const [editItemName, setEditItemName] = useState("");
-  const [editQty, setEditQty] = useState(1);
+  const [editItems, setEditItems] = useState<{ name: string; qty: number }[]>([{ name: "", qty: 1 }]);
   const [editWarehouseId, setEditWarehouseId] = useState("");
   const [editCategory, setEditCategory] = useState<ReturnCategory>("tukar_unit");
   const [editReason, setEditReason] = useState("");
@@ -93,10 +91,16 @@ export default function StockReturnsPanel() {
     return true;
   }), [returns, statusFilter, whFilter]);
 
+  const updateItemName = (i: number, v: string) => setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, name: v } : it)));
+  const updateItemQty = (i: number, v: number) => setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, qty: v } : it)));
+  const addItemRow = () => setItems((arr) => [...arr, { name: "", qty: 1 }]);
+  const removeItemRow = (i: number) => setItems((arr) => (arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)));
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!warehouseId) { setError("Pilih asal cabang dulu."); return; }
-    if (!itemName.trim()) { setError("Isi nama barang dulu."); return; }
+    const cleanItems = items.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
+    if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
     if (so.trim() && !SO_RE.test(so.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
     setBusy(true);
     setError(null);
@@ -104,8 +108,8 @@ export default function StockReturnsPanel() {
       return_date: returnDate || todayISO(),
       so_number: so.trim() || null,
       order_number: orderNo.trim() || null,
-      item_name: itemName.trim(),
-      qty: Math.max(1, Math.round(qty) || 1),
+      items: cleanItems.map((it) => it.name),
+      item_qtys: cleanItems.map((it) => it.qty),
       warehouse_id: warehouseId,
       category,
       reason: reason.trim() || null,
@@ -114,7 +118,7 @@ export default function StockReturnsPanel() {
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setSo(""); setOrderNo(""); setItemName(""); setQty(1); setCategory("tukar_unit"); setReason(""); setProofUrl(""); setReturnDate(todayISO());
+    setSo(""); setOrderNo(""); setItems([{ name: "", qty: 1 }]); setCategory("tukar_unit"); setReason(""); setProofUrl(""); setReturnDate(todayISO());
     fetchData();
   }
 
@@ -130,12 +134,17 @@ export default function StockReturnsPanel() {
     if (error) { setError(error); load(); }
   }
 
+  const updateEditItemName = (i: number, v: string) => setEditItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, name: v } : it)));
+  const updateEditItemQty = (i: number, v: number) => setEditItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, qty: v } : it)));
+  const addEditItemRow = () => setEditItems((arr) => [...arr, { name: "", qty: 1 }]);
+  const removeEditItemRow = (i: number) => setEditItems((arr) => (arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)));
+
   function startEdit(r: StockReturn) {
+    const list = returnItems(r);
     setEditDate(r.return_date);
     setEditSo(r.so_number ?? "");
     setEditOrderNo(r.order_number ?? "");
-    setEditItemName(r.item_name);
-    setEditQty(r.qty);
+    setEditItems(list.length ? list.map((it) => ({ name: it.name, qty: it.qty })) : [{ name: "", qty: 1 }]);
     setEditWarehouseId(r.warehouse_id ?? "");
     setEditCategory(r.category);
     setEditReason(r.reason ?? "");
@@ -145,7 +154,8 @@ export default function StockReturnsPanel() {
   function cancelEdit() { setEditingId(null); }
 
   async function saveEdit(id: string) {
-    if (!editItemName.trim()) { setError("Isi nama barang dulu."); return; }
+    const cleanItems = editItems.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
+    if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
     if (editSo.trim() && !SO_RE.test(editSo.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
     setEditBusy(true);
     setError(null);
@@ -153,8 +163,10 @@ export default function StockReturnsPanel() {
       return_date: editDate || todayISO(),
       so_number: editSo.trim() || null,
       order_number: editOrderNo.trim() || null,
-      item_name: editItemName.trim(),
-      qty: Math.max(1, Math.round(editQty) || 1),
+      items: cleanItems.map((it) => it.name),
+      item_qtys: cleanItems.map((it) => it.qty),
+      item_name: cleanItems[0].name,
+      qty: cleanItems[0].qty,
       warehouse_id: editWarehouseId || null,
       category: editCategory,
       reason: editReason.trim() || null,
@@ -205,16 +217,32 @@ export default function StockReturnsPanel() {
                 <Labeled label="Nomor Pesanan">
                   <input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="No Pesanan" className={INPUT} />
                 </Labeled>
-                <Labeled label="Nama barang">
-                  <input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="Nama barang" className={INPUT} />
-                </Labeled>
-                <Labeled label="Jumlah">
-                  <input
-                    type="number" min={1} value={qty}
-                    onChange={(e) => setQty(Number(e.target.value))}
-                    className={INPUT}
-                  />
-                </Labeled>
+                <div className="md:col-span-2">
+                  <label className="text-[11px] text-slate-500">Barang &amp; jumlah (bisa lebih dari satu)</label>
+                  <div className="mt-1 space-y-1.5">
+                    {items.map((it, i) => (
+                      <div key={i} className="flex gap-1.5">
+                        <input value={it.name} onChange={(e) => updateItemName(i, e.target.value)} placeholder={`Nama barang ${i + 1}`} className={INPUT} />
+                        <input
+                          type="number"
+                          min={1}
+                          value={it.qty}
+                          onChange={(e) => updateItemQty(i, Number(e.target.value))}
+                          title="Jumlah (qty)"
+                          className="shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                        />
+                        {items.length > 1 && (
+                          <button type="button" onClick={() => removeItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" onClick={addItemRow} className="inline-flex items-center gap-1 text-xs font-medium text-brand-hover hover:underline">
+                      <Plus size={13} /> Tambah item
+                    </button>
+                  </div>
+                </div>
                 <Labeled label="Kategori retur">
                   <select value={category} onChange={(e) => setCategory(e.target.value as ReturnCategory)} className={INPUT}>
                     {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
@@ -294,12 +322,32 @@ export default function StockReturnsPanel() {
                           <Labeled label="Nomor Pesanan">
                             <input value={editOrderNo} onChange={(e) => setEditOrderNo(e.target.value)} placeholder="No Pesanan" className={INPUT} />
                           </Labeled>
-                          <Labeled label="Nama barang">
-                            <input value={editItemName} onChange={(e) => setEditItemName(e.target.value)} className={INPUT} />
-                          </Labeled>
-                          <Labeled label="Jumlah">
-                            <input type="number" min={1} value={editQty} onChange={(e) => setEditQty(Number(e.target.value))} className={INPUT} />
-                          </Labeled>
+                          <div className="md:col-span-2">
+                            <label className="text-[11px] text-slate-500">Barang &amp; jumlah</label>
+                            <div className="mt-1 space-y-1.5">
+                              {editItems.map((it, i) => (
+                                <div key={i} className="flex gap-1.5">
+                                  <input value={it.name} onChange={(e) => updateEditItemName(i, e.target.value)} placeholder={`Nama barang ${i + 1}`} className={INPUT} />
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={it.qty}
+                                    onChange={(e) => updateEditItemQty(i, Number(e.target.value))}
+                                    title="Jumlah (qty)"
+                                    className="shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                                  />
+                                  {editItems.length > 1 && (
+                                    <button type="button" onClick={() => removeEditItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
+                                      <X size={15} />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button type="button" onClick={addEditItemRow} className="inline-flex items-center gap-1 text-xs font-medium text-brand-hover hover:underline">
+                                <Plus size={13} /> Tambah item
+                              </button>
+                            </div>
+                          </div>
                           <Labeled label="Kategori retur">
                             <select value={editCategory} onChange={(e) => setEditCategory(e.target.value as ReturnCategory)} className={INPUT}>
                               {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
@@ -330,12 +378,14 @@ export default function StockReturnsPanel() {
                     );
                   }
 
+                  const list = returnItems(r);
                   return (
                     <div key={r.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3">
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-slate-900 truncate">{r.item_name}{r.qty > 1 ? ` ×${r.qty}` : ""}</p>
+                            <p className="font-semibold text-slate-900 truncate">{list.length === 0 ? "-" : list.length > 1 ? `${list[0].name} +${list.length - 1}` : `${list[0].name}${list[0].qty > 1 ? ` ×${list[0].qty}` : ""}`}</p>
+                            {list.length > 1 && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-kla-purpleLight text-kla-purple">{list.length} barang</span>}
                             <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border bg-kla-purpleLight text-kla-purple border-kla-purple/30">{CATEGORY_LABEL[r.category]}</span>
                             <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span>
                             {r.proof_url && (
@@ -344,6 +394,7 @@ export default function StockReturnsPanel() {
                               </a>
                             )}
                           </div>
+                          {list.length > 1 && <p className="text-sm text-slate-600 mt-1">Barang: {list.map((it) => `${it.name}${it.qty > 1 ? ` ×${it.qty}` : ""}`).join(", ")}</p>}
                           <p className="text-sm text-slate-500 mt-1">{r.return_date} · {wh?.name ?? "Cabang tidak dikenal"} · SO {r.so_number || "-"} · Pesanan {r.order_number || "-"}</p>
                           {r.reason && <p className="text-sm text-slate-600 mt-1">{r.reason}</p>}
 
