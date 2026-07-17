@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check, ChevronDown } from "lucide-react";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check, ChevronDown, Search } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
@@ -43,6 +43,7 @@ export default function WarehouseOrdersPanel() {
   const [ekspFilter, setEkspFilter] = useState<Set<Ekspedisi>>(new Set());
   const [warehouseFilter, setWarehouseFilter] = useState<Set<string>>(new Set());
   const [storeFilter, setStoreFilter] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -136,15 +137,23 @@ export default function WarehouseOrdersPanel() {
       setWarehouseId(scopedWarehouses[0].id);
     }
   }, [scopedWarehouses, warehouseId]);
-  const shown = useMemo(() => orders.filter((o) => {
-    if (statusFilter.size && !statusFilter.has(o.status)) return false;
-    if (ekspFilter.size && !ekspFilter.has(o.ekspedisi)) return false;
-    if (warehouseFilter.size && !warehouseFilter.has(o.warehouse_id)) return false;
-    if (storeFilter.size && !(o.store_account_id && storeFilter.has(o.store_account_id))) return false;
-    if (fromDate && (o.order_date ?? "") < fromDate) return false;
-    if (toDate && (o.order_date ?? "") > toDate) return false;
-    return true;
-  }), [orders, statusFilter, ekspFilter, warehouseFilter, storeFilter, fromDate, toDate]);
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (statusFilter.size && !statusFilter.has(o.status)) return false;
+      if (ekspFilter.size && !ekspFilter.has(o.ekspedisi)) return false;
+      if (warehouseFilter.size && !warehouseFilter.has(o.warehouse_id)) return false;
+      if (storeFilter.size && !(o.store_account_id && storeFilter.has(o.store_account_id))) return false;
+      if (fromDate && (o.order_date ?? "") < fromDate) return false;
+      if (toDate && (o.order_date ?? "") > toDate) return false;
+      if (q) {
+        const names = orderItems(o).map((it) => it.name.toLowerCase()).join(" ");
+        const haystack = `${names} ${(o.so_number ?? "").toLowerCase()} ${(o.order_number ?? "").toLowerCase()}`;
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [orders, statusFilter, ekspFilter, warehouseFilter, storeFilter, search, fromDate, toDate]);
 
   // Group by warehouse, then split by ekspedisi (Instan first as priority) so
   // each branch+priority gets its own combined send.
@@ -323,7 +332,7 @@ export default function WarehouseOrdersPanel() {
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
-      <div className="px-6 md:px-10 py-6 md:py-8 max-w-4xl">
+      <div className="px-6 md:px-10 py-6 md:py-8 max-w-7xl">
         <div className="flex items-start gap-4 mb-6">
           <div className="w-12 h-12 rounded-xl bg-brand-light flex items-center justify-center shrink-0 border border-brand-muted">
             <ClipboardList size={24} className="text-brand-hover" />
@@ -344,7 +353,7 @@ export default function WarehouseOrdersPanel() {
           <>
             {/* Add form */}
             <form onSubmit={handleAdd} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-5 mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
                 <Labeled label="Gudang tujuan">
                   <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={INPUT}>
                     {scopedWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -353,7 +362,7 @@ export default function WarehouseOrdersPanel() {
                 <Labeled label="Tanggal">
                   <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className={INPUT} />
                 </Labeled>
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 xl:col-span-3">
                   <label className="text-[11px] text-slate-500">Barang &amp; jumlah (bisa lebih dari satu)</label>
                   <div className="mt-1 space-y-1.5">
                     {items.map((it, i) => (
@@ -437,6 +446,22 @@ export default function WarehouseOrdersPanel() {
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah Order
               </button>
             </form>
+
+            {/* Search */}
+            <div className="relative mb-3 max-w-md">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama barang, nomor pesanan, atau nomor SO…"
+                className="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-danger">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
             {/* Filters — multi-select dropdowns */}
             <div className="flex items-center gap-1.5 flex-wrap mb-3">
@@ -535,12 +560,13 @@ export default function WarehouseOrdersPanel() {
                           if (isEditing) {
                             return (
                               <div key={o.id} className="bg-white rounded-xl border-2 border-brand shadow-sm p-3">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                                   <Labeled label="Tanggal">
                                     <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={INPUT} />
                                   </Labeled>
                                   <div />
-                                  <div className="md:col-span-2">
+                                  <div />
+                                  <div className="md:col-span-2 xl:col-span-3">
                                     <label className="text-[11px] text-slate-500">Barang &amp; jumlah</label>
                                     <div className="mt-1 space-y-1.5">
                                       {editItems.map((it, i) => (
