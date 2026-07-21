@@ -181,10 +181,17 @@ export default function KpiTimPanel() {
     setLoading(true);
     const indicators = await listIndicators(pic);
     const ids = indicators.map((i) => i.id);
+
+    // Auto-sync indikator AUTO dari orderan sebelum render
+    const autoInds = indicators.filter((i) => i.source_field);
+    if (autoInds.length) {
+      await syncKpiFromOrders(pic, month, autoInds, profile?.id ?? null);
+    }
+
     const [actuals, monthlyTargets] = await Promise.all([listActuals(ids, month), listMonthlyTargets(ids, month)]);
     setRows(buildKpiRows(indicators, actuals, monthlyTargets));
     setLoading(false);
-  }, [pic, month]);
+  }, [pic, month, profile?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -321,16 +328,12 @@ export default function KpiTimPanel() {
             <p className="text-sm text-slate-400">Hover indikator untuk rename ✏️ atau hapus · target disimpan per bulan</p>
           </div>
         </div>
-        {rows.some((r) => r.source_field) && (
-          <div className="flex flex-col items-end gap-1">
-            <button onClick={handleSync} disabled={syncing}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm text-white font-medium transition-all disabled:opacity-60">
-              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Sync…" : "Sync dari Orderan"}
-            </button>
-            {syncMsg && <p className="text-xs text-green-400">{syncMsg}</p>}
-          </div>
-        )}
+        <button onClick={() => load()} disabled={loading}
+          title="Refresh data dari orderan"
+          className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs text-slate-400 hover:text-white transition-all disabled:opacity-50">
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </div>
 
       {/* Filters */}
