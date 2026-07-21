@@ -5,8 +5,9 @@ import { Award, TrendingUp, Loader2, Pencil, Check, X, RefreshCw } from "lucide-
 import { useAuth } from "@/lib/auth";
 import {
   PIC_LIST, PicName, KpiRow, KpiUnit,
-  listIndicators, listActuals, upsertActual, buildKpiRows, fmtKpiValue,
-  updateIndicatorTarget, syncKpiFromOrders,
+  listIndicators, listActuals, listMonthlyTargets,
+  upsertActual, upsertMonthlyTarget, buildKpiRows, fmtKpiValue,
+  syncKpiFromOrders,
 } from "@/lib/kpi";
 
 const MONTHS_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
@@ -64,18 +65,19 @@ function ActualInput({ row, onSave }: { row: KpiRow; onSave: (id: string, val: n
   );
 }
 
-function TargetEdit({ row, onSave, onCancel }: {
+function TargetEdit({ row, month, onSave, onCancel }: {
   row: KpiRow;
-  onSave: (id: string, val: number) => Promise<void>;
+  month: string;
+  onSave: (id: string, month: string, val: number) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [val, setVal] = useState(String(row.target_value));
+  const [val, setVal] = useState(String(row.effective_target));
   const [saving, setSaving] = useState(false);
 
   async function commit() {
     const n = parseFloat(val) || 0;
     setSaving(true);
-    await onSave(row.id, n);
+    await onSave(row.id, month, n);
     setSaving(false);
   }
 
@@ -109,8 +111,12 @@ export default function KpiTimPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     const indicators = await listIndicators(pic);
-    const actuals = await listActuals(indicators.map((i) => i.id), month);
-    setRows(buildKpiRows(indicators, actuals));
+    const ids = indicators.map((i) => i.id);
+    const [actuals, monthlyTargets] = await Promise.all([
+      listActuals(ids, month),
+      listMonthlyTargets(ids, month),
+    ]);
+    setRows(buildKpiRows(indicators, actuals, monthlyTargets));
     setLoading(false);
   }, [pic, month]);
 
@@ -121,8 +127,8 @@ export default function KpiTimPanel() {
     await load();
   }
 
-  async function handleSaveTarget(indicatorId: string, val: number) {
-    await updateIndicatorTarget(indicatorId, val);
+  async function handleSaveTarget(indicatorId: string, targetMonth: string, val: number) {
+    await upsertMonthlyTarget(indicatorId, targetMonth, val, profile?.id ?? null);
     setEditingTargetId(null);
     await load();
   }
@@ -132,11 +138,7 @@ export default function KpiTimPanel() {
     setSyncMsg(null);
     const indicators = await listIndicators(pic);
     const autoInds = indicators.filter((i) => i.source_field);
-    if (!autoInds.length) {
-      setSyncMsg("Tidak ada indikator auto untuk " + pic);
-      setSyncing(false);
-      return;
-    }
+    if (!autoInds.length) { setSyncMsg("Tidak ada indikator auto untuk " + pic); setSyncing(false); return; }
     const { revenue, kombo } = await syncKpiFromOrders(pic, month, autoInds, profile?.id ?? null);
     await load();
     setSyncing(false);
@@ -166,18 +168,13 @@ export default function KpiTimPanel() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">KPI Tim</h1>
-            <p className="text-sm text-slate-400">Capaian KPI bulanan per anggota tim</p>
+            <p className="text-sm text-slate-400">Target disimpan per bulan · klik ✏️ untuk ubah target bulan ini</p>
           </div>
         </div>
-
-        {/* Sync button */}
         {hasAutoIndicators && (
           <div className="flex flex-col items-end gap-1">
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm text-white font-medium transition-all disabled:opacity-60"
-            >
+            <button onClick={handleSync} disabled={syncing}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm text-white font-medium transition-all disabled:opacity-60">
               <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
               {syncing ? "Sync…" : "Sync dari Orderan"}
             </button>
@@ -212,9 +209,7 @@ export default function KpiTimPanel() {
           </p>
           <ProgressBar pct={totalPct} />
         </div>
-        <div className={`text-5xl font-bold ${capaianColor(totalPct)}`}>
-          {totalPct.toFixed(0)}%
-        </div>
+        <div className={`text-5xl font-bold ${capaianColor(totalPct)}`}>{totalPct.toFixed(0)}%</div>
       </div>
 
       {loading ? (
@@ -238,21 +233,19 @@ export default function KpiTimPanel() {
                           <span className="text-sm font-medium text-white">{row.name}</span>
                           <span className="text-xs text-slate-500">bobot {row.bobot}%</span>
                           {row.source_field && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand/20 text-brand border border-brand/30">
-                              AUTO
-                            </span>
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand/20 text-brand border border-brand/30">AUTO</span>
                           )}
                         </div>
 
-                        {/* Target row */}
+                        {/* Target row — per bulan */}
                         <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400">
-                          <span>Target:</span>
+                          <span>Target {monthLabel(month)}:</span>
                           {editingTargetId === row.id ? (
-                            <TargetEdit row={row} onSave={handleSaveTarget} onCancel={() => setEditingTargetId(null)} />
+                            <TargetEdit row={row} month={month} onSave={handleSaveTarget} onCancel={() => setEditingTargetId(null)} />
                           ) : (
                             <span className="flex items-center gap-1">
-                              <b className="text-slate-300">{fmtKpiValue(row.target_value, row.unit as KpiUnit)}</b>
-                              <button onClick={() => setEditingTargetId(row.id)} title="Ubah target"
+                              <b className="text-slate-300">{fmtKpiValue(row.effective_target, row.unit as KpiUnit)}</b>
+                              <button onClick={() => setEditingTargetId(row.id)} title="Ubah target bulan ini"
                                 className="text-slate-600 hover:text-brand ml-0.5">
                                 <Pencil size={11} />
                               </button>
@@ -268,7 +261,6 @@ export default function KpiTimPanel() {
                         <ProgressBar pct={row.capaian_pct} />
                       </div>
 
-                      {/* Right: manual input (disabled + dimmed for AUTO fields) */}
                       <div className="relative">
                         <ActualInput row={row} onSave={handleSaveActual} />
                         {row.source_field && (
