@@ -172,6 +172,29 @@ export async function loadAllPicKpi(month: string): Promise<PicKpiSummary[]> {
   return results;
 }
 
+export async function updateIndicatorName(id: string, name: string) {
+  const { error } = await supabase.from("kpi_indicators").update({ name }).eq("id", id);
+  return { error: error ? error.message : null };
+}
+
+export async function addIndicator(input: {
+  pic_name: PicName;
+  category: KpiCategory;
+  name: string;
+  target_value: number;
+  unit: KpiUnit;
+  bobot: number;
+  sort_order: number;
+}) {
+  const { error } = await supabase.from("kpi_indicators").insert({ ...input, is_active: true, source_field: null });
+  return { error: error ? error.message : null };
+}
+
+export async function deleteIndicator(id: string) {
+  const { error } = await supabase.from("kpi_indicators").update({ is_active: false }).eq("id", id);
+  return { error: error ? error.message : null };
+}
+
 /** Sync auto KPI actuals from warehouse_orders for a PIC + month. */
 export async function syncKpiFromOrders(
   pic: PicName,
