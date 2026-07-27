@@ -145,7 +145,10 @@ export function buildKpiRows(
   return indicators.map((ind) => {
     const effective_target = monthlyTargets?.get(ind.id) ?? ind.target_value;
     const actual_value = actualMap.get(ind.id) ?? 0;
-    const capaian_pct = effective_target > 0 ? (actual_value / effective_target) * 100 : 0;
+    const raw_pct = effective_target > 0 ? (actual_value / effective_target) * 100 : 0;
+    // "Proses" indicators are capped at 100% (can't over-achieve a process
+    // metric like upload/reply rate); "Hasil" indicators can exceed 100%.
+    const capaian_pct = ind.category === "proses" ? Math.min(raw_pct, 100) : raw_pct;
     const nilai_akhir = (capaian_pct * ind.bobot) / 100;
     return { ...ind, effective_target, actual_value, capaian_pct, nilai_akhir };
   });
