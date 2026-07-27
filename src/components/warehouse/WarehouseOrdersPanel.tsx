@@ -11,7 +11,7 @@ import {
 } from "@/lib/warehouse";
 import { StoreAccount, listStoreAccounts, storeDisplayName } from "@/lib/reporting";
 
-const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
+const INPUT = "input-tactile w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   new: "bg-slate-100 text-slate-500 border-slate-200",
@@ -352,7 +352,7 @@ export default function WarehouseOrdersPanel() {
         ) : (
           <>
             {/* Add form */}
-            <form onSubmit={handleAdd} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-5 mb-4">
+            <form onSubmit={handleAdd} className="card-tactile rounded-2xl p-4 md:p-5 mb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
                 <Labeled label="Gudang tujuan">
                   <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={INPUT}>
@@ -374,7 +374,7 @@ export default function WarehouseOrdersPanel() {
                           value={it.qty}
                           onChange={(e) => updateItemQty(i, Number(e.target.value))}
                           title="Jumlah (qty)"
-                          className="shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                          className="input-tactile shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
                         />
                         {items.length > 1 && (
                           <button type="button" onClick={() => removeItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
@@ -442,7 +442,7 @@ export default function WarehouseOrdersPanel() {
                   </label>
                 </Labeled>
               </div>
-              <button type="submit" disabled={busy} className="btn-bounce mt-3 px-4 py-2 rounded-lg bg-brand hover:bg-brand-hover text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+              <button type="submit" disabled={busy} className="btn-bounce btn-tactile-primary mt-3 px-4 py-2 rounded-lg text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah Order
               </button>
             </form>
@@ -545,7 +545,7 @@ export default function WarehouseOrdersPanel() {
                         <button
                           onClick={() => send(wh, ords.filter((o) => selected.has(o.id)))}
                           disabled={selCount === 0}
-                          className="btn-bounce inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success text-white text-xs font-semibold hover:opacity-90 disabled:opacity-40"
+                          className="btn-bounce btn-tactile-success inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
                         >
                           <Send size={13} /> Kirim WA{selCount > 0 ? ` (${selCount})` : ""}
                         </button>
@@ -559,7 +559,7 @@ export default function WarehouseOrdersPanel() {
 
                           if (isEditing) {
                             return (
-                              <div key={o.id} className="bg-white rounded-xl border-2 border-brand shadow-sm p-3">
+                              <div key={o.id} className="card-tactile card-tactile-active rounded-xl p-3">
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                                   <Labeled label="Tanggal">
                                     <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={INPUT} />
@@ -578,7 +578,7 @@ export default function WarehouseOrdersPanel() {
                                             value={it.qty}
                                             onChange={(e) => updateEditItemQty(i, Number(e.target.value))}
                                             title="Jumlah (qty)"
-                                            className="shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                                            className="input-tactile shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
                                           />
                                           {editItems.length > 1 && (
                                             <button type="button" onClick={() => removeEditItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
@@ -640,7 +640,7 @@ export default function WarehouseOrdersPanel() {
                                   </Labeled>
                                 </div>
                                 <div className="flex items-center gap-2 mt-3">
-                                  <button onClick={() => saveEdit(o.id)} disabled={editBusy} className="btn-bounce inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand hover:bg-brand-hover text-slate-900 text-xs font-semibold disabled:opacity-60">
+                                  <button onClick={() => saveEdit(o.id)} disabled={editBusy} className="btn-bounce btn-tactile-primary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-900 text-xs font-semibold disabled:opacity-60">
                                     {editBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
                                   </button>
                                   <button onClick={cancelEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 text-xs font-semibold hover:bg-slate-50">
@@ -652,7 +652,7 @@ export default function WarehouseOrdersPanel() {
                           }
 
                           return (
-                            <div key={o.id} className={`bg-white rounded-xl border shadow-sm p-3 ${checked ? "border-brand" : "border-slate-200"}`}>
+                            <div key={o.id} className={`card-tactile rounded-xl p-3 ${checked ? "card-tactile-active" : ""}`}>
                               <div className="flex items-start gap-3">
                                 <button onClick={() => toggleSelect(o.id)} className="mt-0.5 shrink-0">
                                   {checked ? <CheckSquare size={18} className="text-brand-hover" /> : <Square size={18} className="text-slate-300" />}
@@ -714,7 +714,7 @@ export default function WarehouseOrdersPanel() {
             <p className="font-bold text-slate-900 text-lg leading-snug">{dupWarning}</p>
             <button
               onClick={() => setDupWarning(null)}
-              className="btn-bounce mt-5 w-full py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-slate-900 font-semibold text-sm"
+              className="btn-bounce btn-tactile-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
             >
               Oke, gua cek lagi
             </button>
