@@ -28,7 +28,7 @@ export interface KpiActual {
 
 export interface KpiRow extends KpiIndicator {
   actual_value: number;
-  capaian_pct: number;  // actual / target * 100, capped at 100
+  capaian_pct: number;  // actual / target * 100, uncapped — can exceed 100 when overachieved
   nilai_akhir: number;  // capaian_pct * bobot / 100
 }
 
@@ -138,7 +138,7 @@ export function buildKpiRows(indicators: KpiIndicator[], actuals: KpiActual[]): 
   return indicators.map((ind) => {
     const actual_value = actualMap.get(ind.id) ?? 0;
     const raw_pct = ind.target_value > 0 ? (actual_value / ind.target_value) * 100 : 0;
-    const capaian_pct = Math.min(raw_pct, 100);
+    const capaian_pct = raw_pct;
     const nilai_akhir = (capaian_pct * ind.bobot) / 100;
     return { ...ind, actual_value, capaian_pct, nilai_akhir };
   });
