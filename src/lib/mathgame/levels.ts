@@ -109,10 +109,20 @@ const GENERATORS: Array<() => MathQuestion> = [
   () => wordProblem(), // 14
 ];
 
+export type LevelTier = 1 | 2 | 3 | 4;
+
+export function levelTier(level: number): LevelTier {
+  if (level <= 5) return 1;
+  if (level <= 9) return 2;
+  if (level <= 11) return 3;
+  return 4;
+}
+
 export function levelTitle(level: number): string {
-  if (level <= 5) return "Tambah & Kurang";
-  if (level <= 9) return "Perkalian";
-  if (level <= 11) return "Pembagian";
+  const tier = levelTier(level);
+  if (tier === 1) return "Tambah & Kurang";
+  if (tier === 2) return "Perkalian";
+  if (tier === 3) return "Pembagian";
   return "Soal Campuran";
 }
 

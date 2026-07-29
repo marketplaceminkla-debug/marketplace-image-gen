@@ -44,7 +44,7 @@ export default function MathGameApp() {
         </Link>
 
         <h1 className="font-extrabold text-slate-700 text-sm sm:text-lg text-center flex-1 px-2">
-          🏝️ Petualangan Berhitung — Pulau Angka
+          🏝️ Game Petualangan Matematika
         </h1>
 
         <div className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base font-bold">
