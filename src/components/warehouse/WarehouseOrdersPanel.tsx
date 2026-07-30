@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check, ChevronDown, Search } from "lucide-react";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check, ChevronDown, Search, FileSpreadsheet } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
@@ -173,6 +173,44 @@ export default function WarehouseOrdersPanel() {
     }
     return out;
   }, [shown, whMap]);
+
+  const KOMBO_LABEL: Record<string, string> = { garansi: "Garansi", non_garansi: "Non Garansi" };
+
+  // Export the currently filtered list (respects search + all dropdown/date
+  // filters) to an .xlsx so it can be sliced/pivoted outside the app.
+  async function handleExportExcel() {
+    const XLSX = await import("xlsx");
+    const rows = shown.map((o) => {
+      const list = orderItems(o);
+      const wh = whMap.get(o.warehouse_id);
+      const store = storeAccounts.find((s) => s.id === o.store_account_id);
+      return {
+        "Tanggal": o.order_date ?? "",
+        "Gudang Tujuan": wh?.name ?? "",
+        "Platform / Toko": store ? storeDisplayName(store) : "",
+        "Nomor SO": o.so_number ?? "",
+        "Nomor Pesanan": o.order_number ?? "",
+        "Nama Barang": list.map((it) => `${it.name}${it.qty > 1 ? ` x${it.qty}` : ""}`).join(", "),
+        "Jumlah Barang": list.reduce((s, it) => s + it.qty, 0),
+        "Ekspedisi": EKSPEDISI_LABEL[o.ekspedisi],
+        "Shipment": SHIPMENT_LABEL[o.shipment],
+        "Status": STATUS_LABEL[o.status],
+        "Kombo Hemat": o.kombo_hemat ? KOMBO_LABEL[o.kombo_hemat] ?? o.kombo_hemat : "-",
+        "Harga Jual (Rp)": o.revenue ?? 0,
+        "Keterangan": o.keterangan ?? "",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 12 }, { wch: 16 }, { wch: 28 }, { wch: 20 }, { wch: 18 },
+      { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+      { wch: 14 }, { wch: 15 }, { wch: 30 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Orderan");
+    XLSX.writeFile(wb, `orderan-gudang-${todayISO()}.xlsx`);
+  }
 
   function toggleSelect(id: string) {
     setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -447,20 +485,30 @@ export default function WarehouseOrdersPanel() {
               </button>
             </form>
 
-            {/* Search */}
-            <div className="relative mb-3 max-w-md">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari nama barang, nomor pesanan, atau nomor SO…"
-                className="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand"
-              />
-              {search && (
-                <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-danger">
-                  <X size={14} />
-                </button>
-              )}
+            {/* Search + export */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="relative flex-1 max-w-md">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Cari nama barang, nomor pesanan, atau nomor SO…"
+                  className="input-tactile w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-danger">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleExportExcel}
+                disabled={shown.length === 0}
+                title="Export daftar yang lagi ditampilkan ke Excel"
+                className="btn-bounce shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:border-brand disabled:opacity-50"
+              >
+                <FileSpreadsheet size={15} className="text-success" /> Export Excel
+              </button>
             </div>
 
             {/* Filters — multi-select dropdowns */}
