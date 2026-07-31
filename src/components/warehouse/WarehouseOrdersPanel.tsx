@@ -230,10 +230,10 @@ export default function WarehouseOrdersPanel() {
     e.preventDefault();
     if (!warehouseId) { setError("Pilih gudang tujuan dulu."); return; }
     const trimmedItems = items.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) }));
-    // Satpam: every field is wajib except Resi and Kombo Hemat — block early
+    // Satpam: every field is wajib except Resi, Kombo Hemat, and Keterangan — block early
     // instead of silently dropping empty item rows or defaulting revenue to 0.
     const hasEmptyItemRow = trimmedItems.some((it) => !it.name);
-    const missingRequired = hasEmptyItemRow || !so.trim() || !orderNo.trim() || !ket.trim() || !storeAccountId || !revenue.trim();
+    const missingRequired = hasEmptyItemRow || !so.trim() || !orderNo.trim() || !storeAccountId || !revenue.trim();
     if (missingRequired) { setMissingFieldsWarning(true); return; }
     const cleanItems = trimmedItems;
     if (so.trim() && !SO_RE.test(so.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
@@ -784,7 +784,7 @@ export default function WarehouseOrdersPanel() {
               <span className="text-2xl">🫵</span>
             </div>
             <p className="font-bold text-slate-900 text-lg leading-snug">HAYOLOH ADA YG BELUM DIISI YAA</p>
-            <p className="text-xs text-slate-500 mt-2">Semua field wajib diisi, kecuali Resi & Kombo Hemat.</p>
+            <p className="text-xs text-slate-500 mt-2">Semua field wajib diisi, kecuali Resi, Kombo Hemat & Keterangan.</p>
             <button
               onClick={() => setMissingFieldsWarning(false)}
               className="btn-bounce btn-tactile-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
