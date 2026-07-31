@@ -26,7 +26,7 @@ import WarehouseDbPanel from "@/components/warehouse/WarehouseDbPanel";
 import StockReturnsPanel from "@/components/stock/StockReturnsPanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
-import { NAV, ADMIN_SECTION, ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
+import { NAV, ADMIN_SECTION, ViewId, findSection, viewHref, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { listOrders } from "@/lib/warehouse";
@@ -34,13 +34,19 @@ import { unlockAudio, playChirp } from "@/lib/notifSound";
 import { AppNotification, listNotifications, getLastSeenAt, markSeenNow, relativeTime } from "@/lib/notifications";
 import { Bell, X } from "lucide-react";
 
+function viewFromLocation(): ViewId | null {
+  if (typeof window === "undefined") return null;
+  const v = new URLSearchParams(window.location.search).get("v");
+  return (v as ViewId) || null;
+}
+
 export default function Home() {
   const { session, profile, loading, signOut } = useAuth();
-  const [view, setView] = useState<ViewId>("dash-overview");
+  const [view, setView] = useState<ViewId>(() => viewFromLocation() ?? "dash-overview");
   const [templateUploaded, setTemplateUploaded] = useState(false);
   const [pendingImport, setPendingImport] = useState<ProductImage[] | undefined>(undefined);
   const [panelKey, setPanelKey] = useState(0);
-  const prevView = useRef<ViewId>("dash-overview");
+  const prevView = useRef<ViewId>(view);
   const [notifs, setNotifs] = useState<{ id: number; text: string }[]>([]);
   const notifSeq = useRef(0);
   const knownOrderIds = useRef<Set<string>>(new Set());
@@ -78,6 +84,21 @@ export default function Home() {
     prevView.current = v;
     setPanelKey((k) => k + 1);
     setView(v);
+    window.history.pushState(null, "", viewHref(v));
+  }, []);
+
+  // Browser back/forward should move between views too, since each one now
+  // has its own URL.
+  useEffect(() => {
+    function onPopState() {
+      const v = viewFromLocation();
+      if (!v || v === prevView.current) return;
+      prevView.current = v;
+      setPanelKey((k) => k + 1);
+      setView(v);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   const handleImport = useCallback((images: ProductImage[]) => {
@@ -92,7 +113,8 @@ export default function Home() {
     return NAV.filter((s) => profile.access.includes(s.id));
   }, [profile]);
 
-  // If the current view isn't allowed, jump to the first allowed item.
+  // If the current view isn't allowed (e.g. a stale/foreign URL), jump to
+  // the first allowed item and correct the URL to match.
   useEffect(() => {
     if (visibleSections.length === 0) return;
     const allowed = visibleSections.some((s) => s.items.some((i) => i.id === view));
@@ -100,6 +122,7 @@ export default function Home() {
       const first = visibleSections[0].items[0].id;
       prevView.current = first;
       setView(first);
+      window.history.replaceState(null, "", viewHref(first));
     }
   }, [visibleSections, view]);
 
@@ -364,15 +387,20 @@ export default function Home() {
             {activeSection.items.map((item) => {
               const isActive = view === item.id;
               return (
-                <button
+                <a
                   key={item.id}
-                  onClick={() => handleViewChange(item.id)}
+                  href={viewHref(item.id)}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+                    e.preventDefault();
+                    handleViewChange(item.id);
+                  }}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     isActive ? "bg-brand text-slate-900" : "bg-slate-100 text-slate-600"
                   }`}
                 >
                   {item.shortLabel ?? item.label}
-                </button>
+                </a>
               );
             })}
           </div>

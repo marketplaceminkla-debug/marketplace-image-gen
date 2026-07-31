@@ -101,3 +101,9 @@ export const ADMIN_SECTION: NavSection = {
 export function findSection(view: ViewId, sections: NavSection[] = NAV): NavSection {
   return sections.find((s) => s.items.some((i) => i.id === view)) ?? sections[0];
 }
+
+/** Real URL for a view, so sidebar links support ctrl/cmd-click, middle-click,
+ * and "Open in new tab" — not just JS-driven onClick navigation. */
+export function viewHref(id: ViewId): string {
+  return `/?v=${id}`;
+}

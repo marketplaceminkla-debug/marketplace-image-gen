@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LayoutGrid, ChevronDown, CheckCircle, LogOut, Volume2, VolumeX } from "lucide-react";
-import { ViewId, findSection, type NavSection } from "@/components/layout/workspaceNav";
+import { ViewId, findSection, viewHref, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
 import { isMuted, setMuted, playChirp, unlockAudio } from "@/lib/notifSound";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ const ROLE_LABEL: Record<string, string> = {
   staff: "Staff",
 };
 
-function addRipple(e: React.MouseEvent<HTMLButtonElement>) {
+function addRipple(e: React.MouseEvent<HTMLElement>) {
   const btn = e.currentTarget;
   const rect = btn.getBoundingClientRect();
   const size = Math.max(rect.width, rect.height) * 1.5;
@@ -106,9 +106,15 @@ export default function WorkspaceSidebar({ sections, activeView, onViewChange, t
                               {item.group}
                             </p>
                           )}
-                          <button
-                            onClick={(e) => { addRipple(e); onViewChange(item.id); }}
-                            className={cn("nav-item-btn btn-bounce w-full flex items-center gap-2.5 pl-4 pr-2.5 py-2 rounded-md text-left transition-all", isActive && "active")}
+                          <a
+                            href={viewHref(item.id)}
+                            onClick={(e) => {
+                              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return; // let the browser open a new tab
+                              e.preventDefault();
+                              addRipple(e);
+                              onViewChange(item.id);
+                            }}
+                            className={cn("nav-item-btn btn-bounce w-full flex items-center gap-2.5 pl-4 pr-2.5 py-2 rounded-md text-left transition-all cursor-pointer", isActive && "active")}
                             style={{
                               background: isActive ? "rgba(245,194,0,0.15)" : "transparent",
                               border: isActive ? "1px solid rgba(245,194,0,0.3)" : "1px solid transparent",
@@ -134,7 +140,7 @@ export default function WorkspaceSidebar({ sections, activeView, onViewChange, t
                                 <p className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.3)" }}>{item.description}</p>
                               )}
                             </div>
-                          </button>
+                          </a>
                         </div>
                       );
                     })}
@@ -186,9 +192,15 @@ export default function WorkspaceSidebar({ sections, activeView, onViewChange, t
           const Icon = section.icon;
           const isActive = section.id === activeSection.id;
           return (
-            <button
+            <a
               key={section.id}
-              onClick={(e) => { addRipple(e); onViewChange(section.items[0].id); }}
+              href={viewHref(section.items[0].id)}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+                e.preventDefault();
+                addRipple(e);
+                onViewChange(section.items[0].id);
+              }}
               className="nav-item-btn btn-bounce flex-1 flex flex-col items-center justify-center gap-0.5 h-full"
               style={{ background: "transparent" }}
             >
@@ -196,7 +208,7 @@ export default function WorkspaceSidebar({ sections, activeView, onViewChange, t
               <span className="text-[10px] font-medium" style={{ color: isActive ? "#F5C200" : "rgba(255,255,255,0.4)" }}>
                 {section.label.split(" ")[0]}
               </span>
-            </button>
+            </a>
           );
         })}
       </nav>
