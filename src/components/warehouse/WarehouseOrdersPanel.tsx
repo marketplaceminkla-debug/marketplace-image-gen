@@ -65,6 +65,7 @@ export default function WarehouseOrdersPanel() {
 
   // "Satpam": block duplicate SO / Nomor Pesanan to cut down double-input human error.
   const [dupWarning, setDupWarning] = useState<string | null>(null);
+  const [missingFieldsWarning, setMissingFieldsWarning] = useState(false);
   const checkDuplicate = useCallback((soVal: string, orderNoVal: string, excludeId?: string): string | null => {
     const soClean = soVal.trim();
     const noClean = orderNoVal.trim();
@@ -228,8 +229,13 @@ export default function WarehouseOrdersPanel() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!warehouseId) { setError("Pilih gudang tujuan dulu."); return; }
-    const cleanItems = items.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
-    if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
+    const trimmedItems = items.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) }));
+    // Satpam: every field is wajib except Resi and Kombo Hemat — block early
+    // instead of silently dropping empty item rows or defaulting revenue to 0.
+    const hasEmptyItemRow = trimmedItems.some((it) => !it.name);
+    const missingRequired = hasEmptyItemRow || !so.trim() || !orderNo.trim() || !ket.trim() || !storeAccountId || !revenue.trim();
+    if (missingRequired) { setMissingFieldsWarning(true); return; }
+    const cleanItems = trimmedItems;
     if (so.trim() && !SO_RE.test(so.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
     const dup = checkDuplicate(so, orderNo);
     if (dup) { setDupWarning(dup); return; }
@@ -765,6 +771,25 @@ export default function WarehouseOrdersPanel() {
               className="btn-bounce btn-tactile-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
             >
               Oke, gua cek lagi
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Satpam: required fields not filled (Resi & Kombo Hemat stay optional) */}
+      {missingFieldsWarning && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-warning-light flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🫵</span>
+            </div>
+            <p className="font-bold text-slate-900 text-lg leading-snug">HAYOLOH ADA YG BELUM DIISI YAA</p>
+            <p className="text-xs text-slate-500 mt-2">Semua field wajib diisi, kecuali Resi & Kombo Hemat.</p>
+            <button
+              onClick={() => setMissingFieldsWarning(false)}
+              className="btn-bounce btn-tactile-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
+            >
+              Oke, gua lengkapin
             </button>
           </div>
         </div>
