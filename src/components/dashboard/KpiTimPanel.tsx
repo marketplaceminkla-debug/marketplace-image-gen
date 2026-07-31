@@ -213,11 +213,12 @@ export default function KpiTimPanel() {
     const indicators = await listIndicators(pic);
     const autoInds = indicators.filter((i) => i.source_field);
     if (!autoInds.length) { setSyncMsg("Tidak ada indikator auto untuk " + pic); setSyncing(false); return; }
-    const { revenue, kombo } = await syncKpiFromOrders(pic, month, autoInds, profile?.id ?? null);
+    const { revenue, kombo, marginSum } = await syncKpiFromOrders(pic, month, autoInds, profile?.id ?? null);
     await load(); setSyncing(false);
     const parts: string[] = [];
     if (autoInds.some((i) => i.source_field === "revenue")) parts.push(`Revenue: Rp ${(revenue/1_000_000).toFixed(1)}jt`);
     if (autoInds.some((i) => i.source_field === "kombo_total")) parts.push(`Kombo: ${kombo}`);
+    if (autoInds.some((i) => i.source_field === "margin_sum")) parts.push(`Margin: Rp ${(marginSum/1_000_000).toFixed(1)}jt`);
     setSyncMsg("Disync: " + parts.join(" · "));
     setTimeout(() => setSyncMsg(null), 4000);
   }
@@ -302,7 +303,11 @@ export default function KpiTimPanel() {
                 {/* Right: actual input */}
                 <div>
                   <ActualInput row={row} onSave={handleSaveActual} />
-                  {row.source_field && <p className="text-[10px] text-slate-500 mt-0.5 text-right">dari orderan</p>}
+                  {row.source_field && (
+                    <p className="text-[10px] text-slate-500 mt-0.5 text-right">
+                      {row.source_field === "margin_sum" ? "dari Margin Rona+Diza+Alfin" : "dari orderan"}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

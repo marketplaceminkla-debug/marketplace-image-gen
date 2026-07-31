@@ -15,7 +15,7 @@ export interface KpiIndicator {
   bobot: number;
   sort_order: number;
   is_active: boolean;
-  source_field: "revenue" | "kombo_total" | null;
+  source_field: "revenue" | "kombo_total" | "margin_sum" | null;
 }
 
 export interface KpiActual {
@@ -197,40 +197,74 @@ export async function deleteIndicator(id: string) {
   return { error: error ? error.message : null };
 }
 
-/** Sync auto KPI actuals from warehouse_orders for a PIC + month. */
+/**
+ * Sum the "Margin" (category hasil) indicator's actual_value across
+ * Rona/Diza/Alfin for a month. Matched by name containing "margin" since
+ * each PIC's indicator is worded differently (Margin Laptop, Margin
+ * Aksesoris (...), Margin All (...)) — there's no shared indicator id.
+ */
+async function sumMarginFromOtherPics(month: string): Promise<number> {
+  const { data: marginIndicators } = await supabase
+    .from("kpi_indicators")
+    .select("id")
+    .in("pic_name", ["Rona", "Diza", "Alfin"])
+    .eq("category", "hasil")
+    .eq("is_active", true)
+    .ilike("name", "%margin%");
+  const ids = (marginIndicators ?? []).map((i: { id: string }) => i.id);
+  if (!ids.length) return 0;
+
+  const { data: actuals } = await supabase
+    .from("kpi_actuals")
+    .select("actual_value")
+    .in("indicator_id", ids)
+    .eq("month", month);
+  return (actuals ?? []).reduce((s: number, a: { actual_value: number }) => s + (a.actual_value ?? 0), 0);
+}
+
+/** Sync auto KPI actuals from warehouse_orders (+ cross-PIC Margin sum) for a PIC + month. */
 export async function syncKpiFromOrders(
   pic: PicName,
   month: string,
   indicators: KpiIndicator[],
   userId: string | null,
-): Promise<{ revenue: number; kombo: number }> {
+): Promise<{ revenue: number; kombo: number; marginSum: number }> {
   const storeQuery = supabase.from("store_accounts").select("id");
   if (pic !== "Mauren") storeQuery.eq("pic_name", pic);
   const { data: stores } = await storeQuery;
   const storeIds = (stores ?? []).map((s: { id: string }) => s.id);
-  if (!storeIds.length) return { revenue: 0, kombo: 0 };
 
-  const [y, m] = month.split("-");
-  const daysInMonth = new Date(parseInt(y), parseInt(m), 0).getDate();
-  const monthStart = `${month}-01`;
-  const monthEnd   = `${month}-${String(daysInMonth).padStart(2, "0")}`;
+  let revenue = 0;
+  let kombo = 0;
+  if (storeIds.length) {
+    const [y, m] = month.split("-");
+    const daysInMonth = new Date(parseInt(y), parseInt(m), 0).getDate();
+    const monthStart = `${month}-01`;
+    const monthEnd   = `${month}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const { data: orders } = await supabase
-    .from("warehouse_orders")
-    .select("revenue, kombo_hemat")
-    .in("store_account_id", storeIds)
-    .gte("order_date", monthStart)
-    .lte("order_date", monthEnd)
-    .neq("status", "denied");
+    const { data: orders } = await supabase
+      .from("warehouse_orders")
+      .select("revenue, kombo_hemat")
+      .in("store_account_id", storeIds)
+      .gte("order_date", monthStart)
+      .lte("order_date", monthEnd)
+      .neq("status", "denied");
 
-  const revenue = (orders ?? []).reduce((s: number, o: { revenue: number }) => s + (o.revenue ?? 0), 0);
-  const kombo   = (orders ?? []).filter((o: { kombo_hemat: string | null }) => o.kombo_hemat !== null).length;
+    revenue = (orders ?? []).reduce((s: number, o: { revenue: number }) => s + (o.revenue ?? 0), 0);
+    kombo   = (orders ?? []).filter((o: { kombo_hemat: string | null }) => o.kombo_hemat !== null).length;
+  }
+
+  const needsMarginSum = indicators.some((i) => i.source_field === "margin_sum");
+  const marginSum = needsMarginSum ? await sumMarginFromOtherPics(month) : 0;
 
   for (const ind of indicators) {
     if (!ind.source_field) continue;
-    const val = ind.source_field === "revenue" ? revenue : kombo;
+    const val =
+      ind.source_field === "revenue" ? revenue :
+      ind.source_field === "kombo_total" ? kombo :
+      marginSum;
     await upsertActual(ind.id, month, val, userId);
   }
 
-  return { revenue, kombo };
+  return { revenue, kombo, marginSum };
 }
