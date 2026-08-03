@@ -42,6 +42,11 @@ export default function UserManagementPanel() {
   const [cleaning, setCleaning] = useState(false);
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
 
+  // Maintenance: delete warehouse-resi uploads for a given month
+  const [resiMonth, setResiMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [resiCleaning, setResiCleaning] = useState(false);
+  const [resiMsg, setResiMsg] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -169,6 +174,56 @@ export default function UserManagementPanel() {
     setCleaning(false);
   }
 
+  async function handleCleanupResi() {
+    if (!resiMonth) return;
+    if (!window.confirm(`Hapus semua file resi yang diupload di bulan ${resiMonth} dari storage? Link resi di orderan bulan itu bakal mati (foto resinya udah gak ada). Ini gak bisa dibatalin.`)) return;
+
+    setResiCleaning(true);
+    setResiMsg(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setResiMsg("Sesi habis, coba login ulang."); setResiCleaning(false); return; }
+
+    const [y, m] = resiMonth.split("-");
+    const daysInMonth = new Date(parseInt(y), parseInt(m), 0).getDate();
+    const from = `${resiMonth}-01`;
+    const to = `${resiMonth}-${String(daysInMonth).padStart(2, "0")}`;
+
+    let totalDeleted = 0;
+    let round = 0;
+    try {
+      for (;;) {
+        round++;
+        if (round > 1) setResiMsg(`Masih ada sisa, lanjut membersihkan… (${totalDeleted} resi terhapus sejauh ini)`);
+        const res = await fetch("/api/admin/cleanup-resi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ from, to }),
+        });
+        const text = await res.text();
+        let json: { ok?: boolean; error?: string; deleted?: number; more?: boolean };
+        try {
+          json = JSON.parse(text);
+        } catch {
+          setResiMsg(`Server error (status ${res.status}): ${text.slice(0, 200) || "respons kosong"}`);
+          setResiCleaning(false);
+          return;
+        }
+        if (!res.ok || !json.ok) {
+          setResiMsg(json.error || `Gagal membersihkan resi (status ${res.status}).`);
+          setResiCleaning(false);
+          return;
+        }
+        totalDeleted += json.deleted ?? 0;
+        if (!json.more || round >= 500) break;
+      }
+      setResiMsg(`Selesai! Total ${totalDeleted} file resi bulan ${resiMonth} dihapus dari storage.`);
+    } catch (err) {
+      setResiMsg(`Gagal terhubung ke server: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    setResiCleaning(false);
+  }
+
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
       <div className="px-6 md:px-10 py-6 md:py-8">
@@ -212,6 +267,26 @@ export default function UserManagementPanel() {
           >
             {cleaning ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Bersihkan Foto Lama Sekarang
           </button>
+
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <p className="text-xs text-slate-500 mb-2">Hapus file resi (bukti kirim) yang diupload di bulan tertentu — dipakai buat bebasin storage dari resi orderan lama.</p>
+            {resiMsg && <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-3">{resiMsg}</p>}
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="month"
+                value={resiMonth}
+                onChange={(e) => setResiMonth(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:border-brand"
+              />
+              <button
+                onClick={handleCleanupResi}
+                disabled={resiCleaning || !resiMonth}
+                className="btn-bounce inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-danger/30 bg-danger-light text-danger text-sm font-semibold hover:bg-danger hover:text-white disabled:opacity-60"
+              >
+                {resiCleaning ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Bersihkan Resi Bulan Ini
+              </button>
+            </div>
+          </div>
         </div>
 
         {showAddForm && (
