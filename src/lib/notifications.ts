@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export type NotifCategory = "warehouse" | "product";
+export type NotifCategory = "warehouse" | "product" | "system";
 
 export interface AppNotification {
   id: string;
