@@ -1,4 +1,5 @@
-import { supabase, WAREHOUSE_RESI_BUCKET } from "./supabase";
+import { supabase } from "./supabase";
+import { uploadToCloudinary } from "./cloudinary";
 
 // Nomor SO mask: SO/#####/###### (5 digits then 6 digits) — shared by
 // Orderan Gudang and Stock Management (Retur & Gagal Kirim), since both
@@ -199,18 +200,9 @@ export function waLink(orders: WarehouseOrder[], wh: Warehouse): string {
   return `https://wa.me/${normalizeWa(wh.wa_number)}?text=${encodeURIComponent(buildWaMessage(orders, wh))}`;
 }
 
-/** Upload a resi image to storage and return its public URL. */
+/** Upload a resi image to Cloudinary and return its public URL. */
 export async function uploadResi(file: File): Promise<{ url: string | null; error: string | null }> {
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from(WAREHOUSE_RESI_BUCKET).upload(path, file, {
-    cacheControl: "31536000",
-    upsert: true,
-    contentType: file.type || undefined,
-  });
-  if (error) return { url: null, error: error.message };
-  const { data } = supabase.storage.from(WAREHOUSE_RESI_BUCKET).getPublicUrl(path);
-  return { url: data.publicUrl, error: null };
+  return uploadToCloudinary(file, "marketplace/resi");
 }
 
 // ── Warehouses (nomor WA cabang) ──
