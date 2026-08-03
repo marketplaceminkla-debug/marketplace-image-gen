@@ -1,5 +1,4 @@
-import { supabase } from "./supabase";
-import { uploadToCloudinary } from "./cloudinary";
+import { supabase, TAL_PROOF_BUCKET } from "./supabase";
 
 export type TalCategory = "target" | "strategi" | "lainnya";
 
@@ -63,6 +62,14 @@ export async function deleteTalItem(id: string) {
 export async function uploadTalProof(
   file: File,
 ): Promise<{ url: string | null; name: string | null; error: string | null }> {
-  const { url, error } = await uploadToCloudinary(file, "marketplace/tal-proof");
-  return { url, name: file.name, error };
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from(TAL_PROOF_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    upsert: true,
+    contentType: file.type || undefined,
+  });
+  if (error) return { url: null, name: null, error: error.message };
+  const { data } = supabase.storage.from(TAL_PROOF_BUCKET).getPublicUrl(path);
+  return { url: data.publicUrl, name: file.name, error: null };
 }
