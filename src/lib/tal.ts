@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, TAL_PROOF_BUCKET } from "./supabase";
 
 export type TalCategory = "target" | "strategi" | "lainnya";
 
@@ -64,12 +64,12 @@ export async function uploadTalProof(
 ): Promise<{ url: string | null; name: string | null; error: string | null }> {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from("tal-proof").upload(path, file, {
+  const { error } = await supabase.storage.from(TAL_PROOF_BUCKET).upload(path, file, {
     cacheControl: "31536000",
     upsert: true,
     contentType: file.type || undefined,
   });
   if (error) return { url: null, name: null, error: error.message };
-  const { data } = supabase.storage.from("tal-proof").getPublicUrl(path);
+  const { data } = supabase.storage.from(TAL_PROOF_BUCKET).getPublicUrl(path);
   return { url: data.publicUrl, name: file.name, error: null };
 }

@@ -180,9 +180,10 @@ export default function Home() {
 
   // Notification bell: fetch + poll + realtime for the persistent list.
   const canProduct = !!profile && (profile.role === "super_admin" || profile.access.includes("product"));
+  const canSystem = profile?.role === "super_admin";
   useEffect(() => { setLastSeenAt(getLastSeenAt()); }, []);
   useEffect(() => {
-    if (!canWarehouse && !canProduct) return;
+    if (!canWarehouse && !canProduct && !canSystem) return;
     let active = true;
 
     listNotifications().then((rows) => { if (active) setBellItems(rows); });
@@ -199,7 +200,7 @@ export default function Home() {
       .subscribe();
 
     return () => { active = false; clearInterval(poll); supabase.removeChannel(channel); };
-  }, [canWarehouse, canProduct]);
+  }, [canWarehouse, canProduct, canSystem]);
 
   // Close the bell dropdown on outside click.
   useEffect(() => {
@@ -303,11 +304,12 @@ export default function Home() {
 
   const warehouseNotifs = bellItems.filter((n) => n.category === "warehouse");
   const productNotifs = bellItems.filter((n) => n.category === "product");
+  const systemNotifs = bellItems.filter((n) => n.category === "system");
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-main-bg overflow-hidden">
       {/* Notification bell: persistent history, separated by section */}
-      {(canWarehouse || canProduct) && (
+      {(canWarehouse || canProduct || canSystem) && (
         <div ref={bellRef} className="fixed top-3 right-3 md:top-4 md:right-4 z-[280]">
           <button
             onClick={toggleBell}
@@ -346,6 +348,14 @@ export default function Home() {
                     <div className="pb-1">
                       <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Product Listing</p>
                       {productNotifs.map((n) => (
+                        <NotifRow key={n.id} n={n} unread={n.created_at > prevSeenRef.current} onClick={() => handleNotifClick(n)} />
+                      ))}
+                    </div>
+                  )}
+                  {systemNotifs.length > 0 && (
+                    <div className="pb-1">
+                      <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-amber-500 uppercase tracking-wide">⚠ Sistem</p>
+                      {systemNotifs.map((n) => (
                         <NotifRow key={n.id} n={n} unread={n.created_at > prevSeenRef.current} onClick={() => handleNotifClick(n)} />
                       ))}
                     </div>

@@ -27,3 +27,6 @@ export const TEMPLATES_TABLE = "templates";
 
 // Bucket for warehouse order receipts (resi) — public, optional uploads
 export const WAREHOUSE_RESI_BUCKET = "warehouse-resi";
+
+// Bucket for TAL proof uploads (image/PDF)
+export const TAL_PROOF_BUCKET = "tal-proof";
