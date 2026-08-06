@@ -58,8 +58,13 @@ export default function WarehouseDbPanel() {
   }
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin">
-      <div className="px-6 md:px-10 py-6 md:py-8 max-w-3xl">
+    <div className="h-full overflow-y-auto scrollbar-thin relative">
+      <div className="mw-glass-canvas" aria-hidden="true">
+        <div className="mw-glass-blob mw-glass-blob-1" />
+        <div className="mw-glass-blob mw-glass-blob-2" />
+        <div className="mw-glass-blob mw-glass-blob-3" />
+      </div>
+      <div className="relative px-6 md:px-10 py-6 md:py-8 max-w-3xl">
         <div className="flex items-start gap-4 mb-6">
           <div className="w-12 h-12 rounded-xl bg-brand-light flex items-center justify-center shrink-0 border border-brand-muted">
             <Building2 size={24} className="text-brand-hover" />
@@ -73,13 +78,13 @@ export default function WarehouseDbPanel() {
         {error && <p className="text-xs text-danger bg-danger-light rounded-lg px-3 py-2 mb-4">{error}</p>}
 
         {canEdit && (
-          <form onSubmit={handleAdd} className="card-tactile rounded-2xl p-4 md:p-5 mb-4">
+          <form onSubmit={handleAdd} className="glass-card rounded-2xl p-4 md:p-5 mb-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama gudang (cth: Cirebon)" className="input-tactile px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand" />
-              <input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="Nomor WA (cth: 0812...)" inputMode="tel" className="input-tactile px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand" />
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Catatan (opsional)" className="input-tactile px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand" />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama gudang (cth: Cirebon)" className="glass-input px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand" />
+              <input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="Nomor WA (cth: 0812...)" inputMode="tel" className="glass-input px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand" />
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Catatan (opsional)" className="glass-input px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand" />
             </div>
-            <button type="submit" disabled={busy} className="btn-bounce btn-tactile-primary mt-2.5 px-4 py-2 rounded-lg text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+            <button type="submit" disabled={busy} className="btn-bounce glass-btn-primary mt-2.5 px-4 py-2 rounded-lg text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah Gudang
             </button>
           </form>
@@ -94,13 +99,13 @@ export default function WarehouseDbPanel() {
         ) : (
           <div className="space-y-2.5">
             {rows.map((w) => (
-              <div key={w.id} className="card-tactile rounded-2xl p-4">
+              <div key={w.id} className="glass-card rounded-2xl p-4">
                 {editId === w.id ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
-                    <input value={eName} onChange={(e) => setEName(e.target.value)} className="input-tactile px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900" />
-                    <input value={eWa} onChange={(e) => setEWa(e.target.value)} className="input-tactile px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900" />
+                    <input value={eName} onChange={(e) => setEName(e.target.value)} className="glass-input px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900" />
+                    <input value={eWa} onChange={(e) => setEWa(e.target.value)} className="glass-input px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900" />
                     <div className="flex items-center gap-1.5">
-                      <input value={eNote} onChange={(e) => setENote(e.target.value)} placeholder="Catatan" className="input-tactile flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900" />
+                      <input value={eNote} onChange={(e) => setENote(e.target.value)} placeholder="Catatan" className="glass-input flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900" />
                       <button onClick={() => saveEdit(w.id)} className="w-8 h-8 rounded-lg bg-success-light text-success flex items-center justify-center shrink-0"><Check size={15} /></button>
                       <button onClick={() => setEditId(null)} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center shrink-0"><X size={15} /></button>
                     </div>

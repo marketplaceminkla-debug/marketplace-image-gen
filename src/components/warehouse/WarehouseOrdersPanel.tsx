@@ -11,7 +11,7 @@ import {
 } from "@/lib/warehouse";
 import { StoreAccount, listStoreAccounts, storeDisplayName } from "@/lib/reporting";
 
-const INPUT = "input-tactile w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
+const INPUT = "glass-input w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   new: "bg-slate-100 text-slate-500 border-slate-200",
@@ -375,8 +375,13 @@ export default function WarehouseOrdersPanel() {
   }
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin">
-      <div className="px-6 md:px-10 py-6 md:py-8 max-w-7xl">
+    <div className="h-full overflow-y-auto scrollbar-thin relative">
+      <div className="mw-glass-canvas" aria-hidden="true">
+        <div className="mw-glass-blob mw-glass-blob-1" />
+        <div className="mw-glass-blob mw-glass-blob-2" />
+        <div className="mw-glass-blob mw-glass-blob-3" />
+      </div>
+      <div className="relative px-6 md:px-10 py-6 md:py-8 max-w-7xl">
         <div className="flex items-start gap-4 mb-6">
           <div className="w-12 h-12 rounded-xl bg-brand-light flex items-center justify-center shrink-0 border border-brand-muted">
             <ClipboardList size={24} className="text-brand-hover" />
@@ -396,7 +401,7 @@ export default function WarehouseOrdersPanel() {
         ) : (
           <>
             {/* Add form */}
-            <form onSubmit={handleAdd} className="card-tactile rounded-2xl p-4 md:p-5 mb-4">
+            <form onSubmit={handleAdd} className="glass-card rounded-2xl p-4 md:p-5 mb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
                 <Labeled label="Gudang tujuan">
                   <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={INPUT}>
@@ -418,7 +423,7 @@ export default function WarehouseOrdersPanel() {
                           value={it.qty}
                           onChange={(e) => updateItemQty(i, Number(e.target.value))}
                           title="Jumlah (qty)"
-                          className="input-tactile shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                          className="glass-input shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
                         />
                         {items.length > 1 && (
                           <button type="button" onClick={() => removeItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
@@ -486,7 +491,7 @@ export default function WarehouseOrdersPanel() {
                   </label>
                 </Labeled>
               </div>
-              <button type="submit" disabled={busy} className="btn-bounce btn-tactile-primary mt-3 px-4 py-2 rounded-lg text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+              <button type="submit" disabled={busy} className="btn-bounce glass-btn-primary mt-3 px-4 py-2 rounded-lg text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah Order
               </button>
             </form>
@@ -499,7 +504,7 @@ export default function WarehouseOrdersPanel() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Cari nama barang, nomor pesanan, atau nomor SO…"
-                  className="input-tactile w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand"
+                  className="glass-input w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand"
                 />
                 {search && (
                   <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-danger">
@@ -599,7 +604,7 @@ export default function WarehouseOrdersPanel() {
                         <button
                           onClick={() => send(wh, ords.filter((o) => selected.has(o.id)))}
                           disabled={selCount === 0}
-                          className="btn-bounce btn-tactile-success inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                          className="btn-bounce glass-btn-success inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
                         >
                           <Send size={13} /> Kirim WA{selCount > 0 ? ` (${selCount})` : ""}
                         </button>
@@ -613,7 +618,7 @@ export default function WarehouseOrdersPanel() {
 
                           if (isEditing) {
                             return (
-                              <div key={o.id} className="card-tactile card-tactile-active rounded-xl p-3">
+                              <div key={o.id} className="glass-card glass-card-active rounded-xl p-3">
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                                   <Labeled label="Tanggal">
                                     <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={INPUT} />
@@ -632,7 +637,7 @@ export default function WarehouseOrdersPanel() {
                                             value={it.qty}
                                             onChange={(e) => updateEditItemQty(i, Number(e.target.value))}
                                             title="Jumlah (qty)"
-                                            className="input-tactile shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
+                                            className="glass-input shrink-0 w-16 px-2 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 text-center focus:outline-none focus:border-brand"
                                           />
                                           {editItems.length > 1 && (
                                             <button type="button" onClick={() => removeEditItemRow(i)} className="shrink-0 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-danger flex items-center justify-center">
@@ -694,7 +699,7 @@ export default function WarehouseOrdersPanel() {
                                   </Labeled>
                                 </div>
                                 <div className="flex items-center gap-2 mt-3">
-                                  <button onClick={() => saveEdit(o.id)} disabled={editBusy} className="btn-bounce btn-tactile-primary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-900 text-xs font-semibold disabled:opacity-60">
+                                  <button onClick={() => saveEdit(o.id)} disabled={editBusy} className="btn-bounce glass-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-900 text-xs font-semibold disabled:opacity-60">
                                     {editBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
                                   </button>
                                   <button onClick={cancelEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 text-xs font-semibold hover:bg-slate-50">
@@ -706,7 +711,7 @@ export default function WarehouseOrdersPanel() {
                           }
 
                           return (
-                            <div key={o.id} className={`card-tactile rounded-xl p-3 ${checked ? "card-tactile-active" : ""}`}>
+                            <div key={o.id} className={`glass-card rounded-xl p-3 ${checked ? "glass-card-active" : ""}`}>
                               <div className="flex items-start gap-3">
                                 <button onClick={() => toggleSelect(o.id)} className="mt-0.5 shrink-0">
                                   {checked ? <CheckSquare size={18} className="text-brand-hover" /> : <Square size={18} className="text-slate-300" />}
@@ -761,14 +766,14 @@ export default function WarehouseOrdersPanel() {
       {/* Satpam: duplicate SO / Nomor Pesanan popup */}
       {dupWarning && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+          <div className="glass-panel rounded-2xl w-full max-w-sm p-6 text-center">
             <div className="w-14 h-14 rounded-full bg-danger-light flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">🛑</span>
             </div>
             <p className="font-bold text-slate-900 text-lg leading-snug">{dupWarning}</p>
             <button
               onClick={() => setDupWarning(null)}
-              className="btn-bounce btn-tactile-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
+              className="btn-bounce glass-btn-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
             >
               Oke, gua cek lagi
             </button>
@@ -779,7 +784,7 @@ export default function WarehouseOrdersPanel() {
       {/* Satpam: required fields not filled (Resi & Kombo Hemat stay optional) */}
       {missingFieldsWarning && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+          <div className="glass-panel rounded-2xl w-full max-w-sm p-6 text-center">
             <div className="w-14 h-14 rounded-full bg-warning-light flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">🫵</span>
             </div>
@@ -787,7 +792,7 @@ export default function WarehouseOrdersPanel() {
             <p className="text-xs text-slate-500 mt-2">Semua field wajib diisi, kecuali Resi, Kombo Hemat & Keterangan.</p>
             <button
               onClick={() => setMissingFieldsWarning(false)}
-              className="btn-bounce btn-tactile-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
+              className="btn-bounce glass-btn-primary mt-5 w-full py-2.5 rounded-xl text-slate-900 font-semibold text-sm"
             >
               Oke, gua lengkapin
             </button>
@@ -851,7 +856,7 @@ function MultiSelectFilter<T extends string>({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-20 mt-1.5 min-w-[200px] max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1">
+        <div className="glass-panel absolute left-0 z-20 mt-1.5 min-w-[200px] max-h-64 overflow-y-auto rounded-xl py-1">
           {selected.size > 0 && (
             <button
               type="button"
