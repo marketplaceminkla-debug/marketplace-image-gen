@@ -62,6 +62,15 @@ body,
 .dark .text-slate-400 { color: #807B98; }
 .dark .text-slate-300 { color: #615C7A; }
 
+/* Native <select> dropdown popups are rendered by the OS/browser, not our CSS —
+   they ignore the .dark text-color remap above but keep a light popup background,
+   so the light text renders invisible on a light popup. Force readable colors
+   directly on <option> regardless of theme. */
+select option {
+  color: #0f172a;
+  background-color: #ffffff;
+}
+
 /* Hover states */
 .dark .hover\:bg-white:hover     { background-color: #2A2740; }
 .dark .hover\:bg-slate-50:hover  { background-color: #28243A; }
