@@ -24,6 +24,7 @@ const STATUSES: OrderStatus[] = ["new", "process", "approved", "denied", "done"]
 
 const EKSP_STYLE: Record<Ekspedisi, string> = {
   instan: "bg-warning-light text-warning border-warning/40",
+  sameday: "bg-brand-light text-brand-hover border-brand-muted",
   reguler: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
@@ -159,10 +160,10 @@ export default function WarehouseOrdersPanel() {
   // Group by warehouse, then split by ekspedisi (Instan first as priority) so
   // each branch+priority gets its own combined send.
   const groups = useMemo(() => {
-    const m = new Map<string, { instan: WarehouseOrder[]; reguler: WarehouseOrder[] }>();
+    const m = new Map<string, { instan: WarehouseOrder[]; sameday: WarehouseOrder[]; reguler: WarehouseOrder[] }>();
     const order: string[] = [];
     for (const o of shown) {
-      if (!m.has(o.warehouse_id)) { m.set(o.warehouse_id, { instan: [], reguler: [] }); order.push(o.warehouse_id); }
+      if (!m.has(o.warehouse_id)) { m.set(o.warehouse_id, { instan: [], sameday: [], reguler: [] }); order.push(o.warehouse_id); }
       m.get(o.warehouse_id)![o.ekspedisi].push(o);
     }
     const out: Array<{ wh?: Warehouse; ekspedisi: Ekspedisi; orders: WarehouseOrder[] }> = [];
@@ -170,6 +171,7 @@ export default function WarehouseOrdersPanel() {
       const g = m.get(wid)!;
       const wh = whMap.get(wid);
       if (g.instan.length) out.push({ wh, ekspedisi: "instan", orders: g.instan });
+      if (g.sameday.length) out.push({ wh, ekspedisi: "sameday", orders: g.sameday });
       if (g.reguler.length) out.push({ wh, ekspedisi: "reguler", orders: g.reguler });
     }
     return out;
@@ -446,6 +448,7 @@ export default function WarehouseOrdersPanel() {
                 <Labeled label="Ekspedisi">
                   <select value={ekspedisi} onChange={(e) => setEkspedisi(e.target.value as Ekspedisi)} className={INPUT}>
                     <option value="instan">Instan</option>
+                    <option value="sameday">Sameday</option>
                     <option value="reguler">Reguler</option>
                   </select>
                 </Labeled>
@@ -538,7 +541,7 @@ export default function WarehouseOrdersPanel() {
                 label="Ekspedisi"
                 selected={ekspFilter}
                 onChange={setEkspFilter}
-                options={(["instan", "reguler"] as Ekspedisi[]).map((e) => ({
+                options={(["instan", "sameday", "reguler"] as Ekspedisi[]).map((e) => ({
                   value: e,
                   label: EKSPEDISI_LABEL[e],
                   count: orders.filter((o) => o.ekspedisi === e).length,
@@ -597,7 +600,7 @@ export default function WarehouseOrdersPanel() {
                           {allSel ? <CheckSquare size={16} className="text-brand-hover" /> : <Square size={16} className="text-slate-400" />}
                           {wh?.name ?? "Gudang tidak dikenal"}
                           <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${EKSP_STYLE[grpEksp]}`}>
-                            {grpEksp === "instan" ? "⚡ Instan" : "Reguler"}
+                            {grpEksp === "instan" ? "⚡ Instan" : grpEksp === "sameday" ? "🚀 Sameday" : "Reguler"}
                           </span>
                           <span className="text-xs font-normal text-slate-400">({ords.length})</span>
                         </button>
@@ -660,6 +663,7 @@ export default function WarehouseOrdersPanel() {
                                   <Labeled label="Ekspedisi">
                                     <select value={editEkspedisi} onChange={(e) => setEditEkspedisi(e.target.value as Ekspedisi)} className={INPUT}>
                                       <option value="instan">Instan</option>
+                                      <option value="sameday">Sameday</option>
                                       <option value="reguler">Reguler</option>
                                     </select>
                                   </Labeled>
