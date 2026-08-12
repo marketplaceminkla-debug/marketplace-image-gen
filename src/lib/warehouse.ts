@@ -263,6 +263,21 @@ export async function deleteWarehouse(id: string) {
   return { error: error ? error.message : null };
 }
 
+/** Search existing orders by Nomor Pesanan — used by Stock Management (Retur)
+ * to pull an order's data instead of re-typing it. */
+export async function searchOrdersByOrderNumber(query: string, limit = 15): Promise<WarehouseOrder[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const { data, error } = await supabase
+    .from("warehouse_orders")
+    .select("*")
+    .ilike("order_number", `%${q}%`)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data as WarehouseOrder[];
+}
+
 // ── Orders ──
 export async function listOrders(): Promise<WarehouseOrder[]> {
   const { data, error } = await supabase.from("warehouse_orders").select("*").order("created_at", { ascending: false });

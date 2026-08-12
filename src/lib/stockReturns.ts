@@ -28,6 +28,9 @@ export interface StockReturn {
   items: string[];
   item_qtys: number[];
   warehouse_id: string | null;
+  store_account_id: string | null;
+  revenue: number | null; // harga barang, ditarik dari orderan asal
+  source_order_id: string | null; // orderan gudang asal (kalau dibuat lewat "cari orderan")
   category: ReturnCategory;
   reason: string | null;
   proof_url: string | null;
@@ -62,6 +65,9 @@ export async function addStockReturn(input: {
   items: string[];
   item_qtys: number[];
   warehouse_id: string | null;
+  store_account_id: string | null;
+  revenue: number | null;
+  source_order_id: string | null;
   category: ReturnCategory;
   reason: string | null;
   proof_url: string | null;
