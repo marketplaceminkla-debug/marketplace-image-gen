@@ -139,6 +139,37 @@ export async function getAutoReportData(storeAccountId: string, date: string): P
   return { revenue_today, revenue_total, revenue_estimate, deal_qty, kombo_garansi, kombo_non_garansi, deals };
 }
 
+export interface TopProduct { name: string; qty: number; }
+
+/** Best-selling products for one store account in a given month, ranked by qty sold. */
+export async function getTopProducts(storeAccountId: string, year: number, month: number, limit = 10): Promise<TopProduct[]> {
+  const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+
+  const { data } = await supabase
+    .from("warehouse_orders")
+    .select("items, item_qtys")
+    .eq("store_account_id", storeAccountId)
+    .gte("order_date", monthStart)
+    .lte("order_date", monthEnd)
+    .neq("status", "denied");
+
+  const map = new Map<string, number>();
+  for (const o of data ?? []) {
+    const names: string[] = o.items?.length ? o.items : [];
+    const qtys: number[] = o.item_qtys ?? [];
+    for (let i = 0; i < names.length; i++) {
+      if (!names[i]) continue;
+      map.set(names[i], (map.get(names[i]) ?? 0) + (qtys[i] ?? 1));
+    }
+  }
+  return Array.from(map.entries())
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, limit);
+}
+
 export interface OrderItem { name: string; qty: number; }
 
 /** Items of an order (name + qty), falling back to the legacy single item_name. */

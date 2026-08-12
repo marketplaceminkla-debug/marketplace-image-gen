@@ -21,6 +21,7 @@ import TalPanel from "@/components/dashboard/TalPanel";
 import KpiTimPanel from "@/components/dashboard/KpiTimPanel";
 import ReportHarianPanel from "@/components/dashboard/ReportHarianPanel";
 import MonitoringPanel from "@/components/dashboard/MonitoringPanel";
+import TopProductsPanel from "@/components/dashboard/TopProductsPanel";
 import WarehouseOrdersPanel from "@/components/warehouse/WarehouseOrdersPanel";
 import WarehouseDbPanel from "@/components/warehouse/WarehouseDbPanel";
 import StockReturnsPanel from "@/components/stock/StockReturnsPanel";
@@ -279,6 +280,8 @@ export default function Home() {
         return <ReportHarianPanel />;
       case "dash-monitoring":
         return <MonitoringPanel />;
+      case "dash-top-products":
+        return <TopProductsPanel />;
 
       // ── Product Listing ──
       case "prod-new":

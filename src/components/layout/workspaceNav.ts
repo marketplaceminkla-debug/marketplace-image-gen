@@ -3,12 +3,12 @@ import {
   Boxes, PackagePlus, Tag, Percent, ArrowLeftRight,
   Warehouse, ClipboardList, Building2, PackageX,
   Wrench, LayoutTemplate, FileSpreadsheet, Zap, PackageOpen,
-  ShieldCheck, Users, FileText, BarChart2, Award,
+  ShieldCheck, Users, FileText, BarChart2, Award, Trophy,
   type LucideIcon,
 } from "lucide-react";
 
 export type ViewId =
-  | "dash-overview" | "dash-revenue" | "dash-tal" | "dash-kpi" | "dash-report" | "dash-monitoring"
+  | "dash-overview" | "dash-revenue" | "dash-tal" | "dash-kpi" | "dash-report" | "dash-monitoring" | "dash-top-products"
   | "prod-new" | "prod-price" | "prod-fee" | "prod-sku"
   | "wh-orders" | "wh-list"
   | "stock-returns"
@@ -44,6 +44,7 @@ export const NAV: NavSection[] = [
       { id: "dash-kpi", label: "KPI Tim", shortLabel: "KPI", description: "Capaian KPI per anggota", icon: Award },
       { id: "dash-report", label: "Report Harian", shortLabel: "Report", description: "Input laporan harian per toko", icon: FileText },
       { id: "dash-monitoring", label: "Monitoring Tren", shortLabel: "Tren", description: "Analitik MoM & YoY", icon: BarChart2 },
+      { id: "dash-top-products", label: "Top Produk", shortLabel: "Top Produk", description: "Top 10 produk per platform per bulan", icon: Trophy },
     ],
   },
   {
