@@ -51,6 +51,7 @@ export default function StockReturnsPanel() {
   const [returnDate, setReturnDate] = useState(todayISO());
   const [category, setCategory] = useState<ReturnCategory>("tukar_unit");
   const [reason, setReason] = useState("");
+  const [rc, setRc] = useState("");
   const [busy, setBusy] = useState(false);
 
   // Manual entry fields
@@ -70,6 +71,7 @@ export default function StockReturnsPanel() {
   const [editWarehouseId, setEditWarehouseId] = useState("");
   const [editCategory, setEditCategory] = useState<ReturnCategory>("tukar_unit");
   const [editReason, setEditReason] = useState("");
+  const [editRc, setEditRc] = useState("");
   const [editBusy, setEditBusy] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -134,7 +136,7 @@ export default function StockReturnsPanel() {
   const removeMItemRow = (i: number) => setMItems((arr) => (arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)));
 
   function resetAddForm() {
-    setSelectedOrder(null); setCategory("tukar_unit"); setReason(""); setReturnDate(todayISO());
+    setSelectedOrder(null); setCategory("tukar_unit"); setReason(""); setRc(""); setReturnDate(todayISO());
     setMSo(""); setMOrderNo(""); setMRevenue(""); setMStoreAccountId(""); setMItems([{ name: "", qty: 1 }]);
   }
 
@@ -156,6 +158,7 @@ export default function StockReturnsPanel() {
         store_account_id: selectedOrder.store_account_id,
         revenue: selectedOrder.revenue ?? null,
         source_order_id: selectedOrder.id,
+        rc_number: rc.trim() || null,
         category,
         reason: reason.trim() || null,
         proof_url: null,
@@ -184,6 +187,7 @@ export default function StockReturnsPanel() {
       store_account_id: mStoreAccountId || null,
       revenue: mRevenue.trim() ? Number(mRevenue) : null,
       source_order_id: null,
+      rc_number: rc.trim() || null,
       category,
       reason: reason.trim() || null,
       proof_url: null,
@@ -221,6 +225,7 @@ export default function StockReturnsPanel() {
     setEditWarehouseId(r.warehouse_id ?? "");
     setEditCategory(r.category);
     setEditReason(r.reason ?? "");
+    setEditRc(r.rc_number ?? "");
     setEditingId(r.id);
   }
   function cancelEdit() { setEditingId(null); }
@@ -242,6 +247,7 @@ export default function StockReturnsPanel() {
       warehouse_id: editWarehouseId || null,
       category: editCategory,
       reason: editReason.trim() || null,
+      rc_number: editRc.trim() || null,
     };
     setReturns((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
     const { error } = await updateStockReturn(id, patch);
@@ -422,6 +428,10 @@ export default function StockReturnsPanel() {
                       {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
                     </select>
                   </Labeled>
+                  <Labeled label="Nomor RC (opsional)">
+                    <input value={rc} onChange={(e) => setRc(e.target.value)} placeholder="Nomor RC" className={INPUT} />
+                  </Labeled>
+                  <div />
                   <div className="md:col-span-2">
                     <label className="text-[11px] text-slate-500">Alasan retur / gagal kirim</label>
                     <textarea
@@ -542,6 +552,9 @@ export default function StockReturnsPanel() {
                               {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
                             </select>
                           </Labeled>
+                          <Labeled label="Nomor RC (opsional)">
+                            <input value={editRc} onChange={(e) => setEditRc(e.target.value)} placeholder="Nomor RC" className={INPUT} />
+                          </Labeled>
                           <div className="md:col-span-2">
                             <label className="text-[11px] text-slate-500">Alasan retur / gagal kirim</label>
                             <textarea
@@ -578,7 +591,7 @@ export default function StockReturnsPanel() {
                           </div>
                           {list.length > 1 && <p className="text-sm text-slate-600 mt-1">Barang: {list.map((it) => `${it.name}${it.qty > 1 ? ` ×${it.qty}` : ""}`).join(", ")}</p>}
                           <p className="text-sm text-slate-500 mt-1">
-                            {r.return_date} · {wh?.name ?? "Cabang tidak dikenal"}{store ? ` · ${storeDisplayName(store)}` : ""} · SO {r.so_number || "-"} · Pesanan {r.order_number || "-"}{r.revenue ? ` · ${formatIDR(r.revenue)}` : ""}
+                            {r.return_date} · {wh?.name ?? "Cabang tidak dikenal"}{store ? ` · ${storeDisplayName(store)}` : ""} · SO {r.so_number || "-"} · Pesanan {r.order_number || "-"}{r.revenue ? ` · ${formatIDR(r.revenue)}` : ""}{r.rc_number ? ` · RC ${r.rc_number}` : ""}
                           </p>
                           {r.reason && <p className="text-sm text-slate-600 mt-1">{r.reason}</p>}
 

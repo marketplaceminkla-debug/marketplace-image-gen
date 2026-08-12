@@ -31,6 +31,7 @@ export interface StockReturn {
   store_account_id: string | null;
   revenue: number | null; // harga barang, ditarik dari orderan asal
   source_order_id: string | null; // orderan gudang asal (kalau dibuat lewat "cari orderan")
+  rc_number: string | null; // nomor RC, opsional
   category: ReturnCategory;
   reason: string | null;
   proof_url: string | null;
@@ -68,6 +69,7 @@ export async function addStockReturn(input: {
   store_account_id: string | null;
   revenue: number | null;
   source_order_id: string | null;
+  rc_number: string | null;
   category: ReturnCategory;
   reason: string | null;
   proof_url: string | null;
