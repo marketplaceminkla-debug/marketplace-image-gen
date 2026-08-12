@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { PackageX, Plus, Loader2, Trash2, Pencil, Check, X, ExternalLink, Search, PackageSearch } from "lucide-react";
+import { PackageX, Plus, Loader2, Trash2, Pencil, Check, X, Search, PackageSearch } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Warehouse, WarehouseOrder, listWarehouses, SO_RE, formatSo, searchOrdersByOrderNumber, orderItems } from "@/lib/warehouse";
 import { StoreAccount, listStoreAccounts, storeDisplayName, formatIDR } from "@/lib/reporting";
@@ -48,7 +48,6 @@ export default function StockReturnsPanel() {
   const [returnDate, setReturnDate] = useState(todayISO());
   const [category, setCategory] = useState<ReturnCategory>("tukar_unit");
   const [reason, setReason] = useState("");
-  const [proofUrl, setProofUrl] = useState("");
   const [busy, setBusy] = useState(false);
 
   // Inline edit
@@ -60,7 +59,6 @@ export default function StockReturnsPanel() {
   const [editWarehouseId, setEditWarehouseId] = useState("");
   const [editCategory, setEditCategory] = useState<ReturnCategory>("tukar_unit");
   const [editReason, setEditReason] = useState("");
-  const [editProofUrl, setEditProofUrl] = useState("");
   const [editBusy, setEditBusy] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -136,12 +134,12 @@ export default function StockReturnsPanel() {
       source_order_id: selectedOrder.id,
       category,
       reason: reason.trim() || null,
-      proof_url: proofUrl.trim() || null,
+      proof_url: null,
       created_by: profile?.id ?? null,
     });
     setBusy(false);
     if (error) { setError(error); return; }
-    setSelectedOrder(null); setCategory("tukar_unit"); setReason(""); setProofUrl(""); setReturnDate(todayISO());
+    setSelectedOrder(null); setCategory("tukar_unit"); setReason(""); setReturnDate(todayISO());
     fetchData();
   }
 
@@ -171,7 +169,6 @@ export default function StockReturnsPanel() {
     setEditWarehouseId(r.warehouse_id ?? "");
     setEditCategory(r.category);
     setEditReason(r.reason ?? "");
-    setEditProofUrl(r.proof_url ?? "");
     setEditingId(r.id);
   }
   function cancelEdit() { setEditingId(null); }
@@ -193,7 +190,6 @@ export default function StockReturnsPanel() {
       warehouse_id: editWarehouseId || null,
       category: editCategory,
       reason: editReason.trim() || null,
-      proof_url: editProofUrl.trim() || null,
     };
     setReturns((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
     const { error } = await updateStockReturn(id, patch);
@@ -293,13 +289,11 @@ export default function StockReturnsPanel() {
                   </Labeled>
                   <div />
                   <Labeled label="Kategori retur">
-                  <select value={category} onChange={(e) => setCategory(e.target.value as ReturnCategory)} className={INPUT}>
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
-                  </select>
-                </Labeled>
-                <Labeled label="Link bukti (Google Drive)">
-                  <input value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://drive.google.com/..." className={INPUT} />
-                </Labeled>
+                    <select value={category} onChange={(e) => setCategory(e.target.value as ReturnCategory)} className={INPUT}>
+                      {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
+                    </select>
+                  </Labeled>
+                  <div />
                   <div className="md:col-span-2">
                     <label className="text-[11px] text-slate-500">Alasan retur / gagal kirim</label>
                     <textarea
@@ -417,9 +411,6 @@ export default function StockReturnsPanel() {
                               {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
                             </select>
                           </Labeled>
-                          <Labeled label="Link bukti (Google Drive)">
-                            <input value={editProofUrl} onChange={(e) => setEditProofUrl(e.target.value)} placeholder="https://drive.google.com/..." className={INPUT} />
-                          </Labeled>
                           <div className="md:col-span-2">
                             <label className="text-[11px] text-slate-500">Alasan retur / gagal kirim</label>
                             <textarea
@@ -453,11 +444,6 @@ export default function StockReturnsPanel() {
                             {list.length > 1 && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-kla-purpleLight text-kla-purple">{list.length} barang</span>}
                             <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border bg-kla-purpleLight text-kla-purple border-kla-purple/30">{CATEGORY_LABEL[r.category]}</span>
                             <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span>
-                            {r.proof_url && (
-                              <a href={r.proof_url} target="_blank" rel="noopener noreferrer" className="text-[11px] inline-flex items-center gap-1 text-brand-hover hover:underline">
-                                <ExternalLink size={11} /> Bukti
-                              </a>
-                            )}
                           </div>
                           {list.length > 1 && <p className="text-sm text-slate-600 mt-1">Barang: {list.map((it) => `${it.name}${it.qty > 1 ? ` ×${it.qty}` : ""}`).join(", ")}</p>}
                           <p className="text-sm text-slate-500 mt-1">
