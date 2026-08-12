@@ -10,6 +10,7 @@ import {
   CATEGORY_LABEL, STATUS_LABEL, returnItems,
   listStockReturns, addStockReturn, updateStockReturn, deleteStockReturn,
 } from "@/lib/stockReturns";
+import MultiSelectFilter from "@/components/ui/MultiSelectFilter";
 
 const INPUT = "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand";
 
@@ -36,9 +37,9 @@ export default function StockReturnsPanel() {
   const [returns, setReturns] = useState<StockReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | ReturnStatus>("all");
-  const [whFilter, setWhFilter] = useState<"all" | string>("all");
-  const [storeFilter, setStoreFilter] = useState<"all" | string>("all");
+  const [statusFilter, setStatusFilter] = useState<Set<ReturnStatus>>(new Set());
+  const [whFilter, setWhFilter] = useState<Set<string>>(new Set());
+  const [storeFilter, setStoreFilter] = useState<Set<string>>(new Set());
 
   // Add form: cari orderan yang mau diretur, lalu isi sisanya manual.
   const [orderQuery, setOrderQuery] = useState("");
@@ -88,9 +89,9 @@ export default function StockReturnsPanel() {
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const shown = useMemo(() => returns.filter((r) => {
-    if (statusFilter !== "all" && r.status !== statusFilter) return false;
-    if (whFilter !== "all" && r.warehouse_id !== whFilter) return false;
-    if (storeFilter !== "all" && r.store_account_id !== storeFilter) return false;
+    if (statusFilter.size && !statusFilter.has(r.status)) return false;
+    if (whFilter.size && !whFilter.has(r.warehouse_id ?? "")) return false;
+    if (storeFilter.size && !storeFilter.has(r.store_account_id ?? "")) return false;
     return true;
   }), [returns, statusFilter, whFilter, storeFilter]);
 
@@ -313,41 +314,43 @@ export default function StockReturnsPanel() {
               )}
             </form>
 
-            {/* Filters */}
-            <div className="flex items-center gap-1.5 flex-wrap mb-3">
-              {(["all", ...STATUSES] as const).map((f) => {
-                const count = f === "all" ? returns.length : returns.filter((r) => r.status === f).length;
-                return (
-                  <button key={f} onClick={() => setStatusFilter(f)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${statusFilter === f ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
-                    {f === "all" ? "Semua" : STATUS_LABEL[f]} ({count})
-                  </button>
-                );
-              })}
+            {/* Filters — multi-select dropdowns */}
+            <div className="flex items-center gap-1.5 flex-wrap mb-4">
+              <MultiSelectFilter
+                label="Status"
+                selected={statusFilter}
+                onChange={setStatusFilter}
+                options={STATUSES.map((s) => ({
+                  value: s,
+                  label: STATUS_LABEL[s],
+                  count: returns.filter((r) => r.status === s).length,
+                }))}
+              />
+              {stores.length > 1 && (
+                <MultiSelectFilter
+                  label="Platform / Toko"
+                  selected={storeFilter}
+                  onChange={setStoreFilter}
+                  options={stores.map((s) => ({
+                    value: s.id,
+                    label: storeDisplayName(s),
+                    count: returns.filter((r) => r.store_account_id === s.id).length,
+                  }))}
+                />
+              )}
+              {warehouses.length > 1 && (
+                <MultiSelectFilter
+                  label="Cabang"
+                  selected={whFilter}
+                  onChange={setWhFilter}
+                  options={warehouses.map((w) => ({
+                    value: w.id,
+                    label: w.name,
+                    count: returns.filter((r) => r.warehouse_id === w.id).length,
+                  }))}
+                />
+              )}
             </div>
-            {stores.length > 1 && (
-              <div className="flex items-center gap-1.5 flex-wrap mb-3">
-                <button onClick={() => setStoreFilter("all")} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${storeFilter === "all" ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
-                  Semua toko
-                </button>
-                {stores.map((s) => (
-                  <button key={s.id} onClick={() => setStoreFilter(s.id)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${storeFilter === s.id ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            {warehouses.length > 1 && (
-              <div className="flex items-center gap-1.5 flex-wrap mb-4">
-                <button onClick={() => setWhFilter("all")} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${whFilter === "all" ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
-                  Semua cabang
-                </button>
-                {warehouses.map((w) => (
-                  <button key={w.id} onClick={() => setWhFilter(w.id)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${whFilter === w.id ? "bg-brand text-slate-900 border-brand" : "bg-white text-slate-600 border-slate-200"}`}>
-                    {w.name}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* List */}
             {loading ? (
