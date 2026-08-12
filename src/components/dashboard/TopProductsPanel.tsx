@@ -23,7 +23,9 @@ export default function TopProductsPanel() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    listStoreAccounts().then(setStores);
+    // "ALL STORES" is a virtual/combined-report account with no orders of its
+    // own tagged to it — it never has data here, so skip it from this view.
+    listStoreAccounts().then((s) => setStores(s.filter((a) => a.name.trim().toUpperCase() !== "ALL STORES")));
   }, []);
 
   useEffect(() => {
