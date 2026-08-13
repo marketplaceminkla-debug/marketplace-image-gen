@@ -30,7 +30,7 @@ import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, viewHref, type NavSection } from "@/components/layout/workspaceNav";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { listOrders } from "@/lib/warehouse";
+import { listOrdersForNotify } from "@/lib/warehouse";
 import { unlockAudio, playChirp } from "@/lib/notifSound";
 import { AppNotification, listNotifications, getLastSeenAt, markSeenNow, relativeTime } from "@/lib/notifications";
 import { Bell, X } from "lucide-react";
@@ -153,19 +153,21 @@ export default function Home() {
     let active = true;
 
     // Baseline: record existing orders without notifying.
-    listOrders().then((rows) => {
+    listOrdersForNotify().then((rows) => {
       if (!active) return;
       rows.forEach((r) => knownOrderIds.current.add(r.id));
       notifBaseline.current = true;
     });
 
     // Poll: fallback safety net only (realtime below covers the instant path).
-    // Kept slow and only dispatches "wh-orders-changed" when it actually finds
-    // a new row — a fixed-interval fetch-and-broadcast here was doubling up
-    // with the realtime handler on every open Orderan Gudang panel and
-    // burning Supabase egress quota for no benefit.
+    // Kept slow, uses a minimal-column query (id/creator/item name — all
+    // notifyNewOrders needs, not the full row), and only dispatches
+    // "wh-orders-changed" when it actually finds a new row — a fixed-interval
+    // full-table fetch-and-broadcast here was doubling up with the realtime
+    // handler on every open Orderan Gudang panel and burning Supabase egress
+    // quota for no benefit.
     const poll = setInterval(async () => {
-      const rows = await listOrders();
+      const rows = await listOrdersForNotify();
       if (!active) return;
       const before = knownOrderIds.current.size;
       notifyNewOrders(rows);

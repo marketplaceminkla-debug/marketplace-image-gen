@@ -1,4 +1,5 @@
 import { supabase, TAL_PROOF_BUCKET } from "./supabase";
+import { compressImageFile } from "./imageCompress";
 
 export type TalCategory = "target" | "strategi" | "lainnya";
 
@@ -62,12 +63,13 @@ export async function deleteTalItem(id: string) {
 export async function uploadTalProof(
   file: File,
 ): Promise<{ url: string | null; name: string | null; error: string | null }> {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const compressed = await compressImageFile(file); // PDFs pass through untouched
+  const ext = compressed.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from(TAL_PROOF_BUCKET).upload(path, file, {
+  const { error } = await supabase.storage.from(TAL_PROOF_BUCKET).upload(path, compressed, {
     cacheControl: "31536000",
     upsert: true,
-    contentType: file.type || undefined,
+    contentType: compressed.type || undefined,
   });
   if (error) return { url: null, name: null, error: error.message };
   const { data } = supabase.storage.from(TAL_PROOF_BUCKET).getPublicUrl(path);

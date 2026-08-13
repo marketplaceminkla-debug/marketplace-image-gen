@@ -1,4 +1,5 @@
 import { supabase, WAREHOUSE_RESI_BUCKET } from "./supabase";
+import { compressImageFile } from "./imageCompress";
 
 // Nomor SO mask: SO/#####/###### (5 digits then 6 digits) — shared by
 // Orderan Gudang and Stock Management (Retur & Gagal Kirim), since both
@@ -232,12 +233,13 @@ export function waLink(orders: WarehouseOrder[], wh: Warehouse): string {
 
 /** Upload a resi image to storage and return its public URL. */
 export async function uploadResi(file: File): Promise<{ url: string | null; error: string | null }> {
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const compressed = await compressImageFile(file);
+  const ext = (compressed.name.split(".").pop() || "jpg").toLowerCase();
   const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from(WAREHOUSE_RESI_BUCKET).upload(path, file, {
+  const { error } = await supabase.storage.from(WAREHOUSE_RESI_BUCKET).upload(path, compressed, {
     cacheControl: "31536000",
     upsert: true,
-    contentType: file.type || undefined,
+    contentType: compressed.type || undefined,
   });
   if (error) return { url: null, error: error.message };
   const { data } = supabase.storage.from(WAREHOUSE_RESI_BUCKET).getPublicUrl(path);
@@ -283,6 +285,28 @@ export async function listOrders(): Promise<WarehouseOrder[]> {
   const { data, error } = await supabase.from("warehouse_orders").select("*").order("created_at", { ascending: false });
   if (error || !data) return [];
   return data as WarehouseOrder[];
+}
+
+export interface OrderNotifyRow {
+  id: string;
+  created_by: string | null;
+  item_name: string | null;
+  items: string[] | null;
+}
+
+/**
+ * Minimal-column version of listOrders(), used by the "new order" toast/sound
+ * poll — that only needs id/creator/item name to diff against known ids, not
+ * every column on every row. Full-table `select("*")` on a fixed interval was
+ * the single biggest driver of Supabase egress in this app.
+ */
+export async function listOrdersForNotify(): Promise<OrderNotifyRow[]> {
+  const { data, error } = await supabase
+    .from("warehouse_orders")
+    .select("id, created_by, item_name, items")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data as OrderNotifyRow[];
 }
 /** Orders filtered by store account and date — used by Report Harian to sync deals. */
 export async function listOrdersByStore(storeAccountId: string, date: string): Promise<WarehouseOrder[]> {
