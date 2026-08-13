@@ -51,6 +51,11 @@ export default function Home() {
   const [notifs, setNotifs] = useState<{ id: number; text: string }[]>([]);
   const notifSeq = useRef(0);
   const knownOrderIds = useRef<Set<string>>(new Set());
+  const pendingNewOrders = useRef<Array<{ id?: string; created_by?: string | null; item_name?: string | null; items?: string[] | null }>>([]);
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastChirpAt = useRef(0);
+  const pendingBellItems = useRef<AppNotification[]>([]);
+  const bellFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifBaseline = useRef(false);
 
   // Notification center (bell icon): persistent history, separate from the
@@ -133,20 +138,42 @@ export default function Home() {
   const canWarehouse = !!profile && (profile.role === "super_admin" || profile.access.includes("warehouse"));
   const myId = profile?.id;
 
+  // Batches bursts of new-order events (e.g. a bulk SQL restore firing
+  // hundreds of realtime INSERTs at once) into a single toast + chirp every
+  // ~400ms, instead of one setState + audio.play() per row — which was
+  // enough to freeze the tab when ~1000 rows landed at once.
+  const flushNewOrderNotifs = useCallback(() => {
+    flushTimer.current = null;
+    const rows = pendingNewOrders.current;
+    pendingNewOrders.current = [];
+    if (!rows.length) return;
+    const now = Date.now();
+    if (now - lastChirpAt.current > 1500) {
+      playChirp();
+      lastChirpAt.current = now;
+    }
+    const first = rows[0];
+    const firstItems = first.items?.length ? first.items : first.item_name ? [first.item_name] : [];
+    const label = rows.length === 1
+      ? (firstItems.length ? `${firstItems[0]}${firstItems.length > 1 ? ` +${firstItems.length - 1}` : ""}` : "barang baru")
+      : `${rows.length} orderan sekaligus`;
+    const id = ++notifSeq.current;
+    setNotifs((n) => [...n.slice(-4), { id, text: `Orderan baru: ${label}` }]);
+    setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 8000);
+  }, []);
+
   const notifyNewOrders = useCallback((rows: Array<{ id?: string; created_by?: string | null; item_name?: string | null; items?: string[] | null }>) => {
     for (const row of rows) {
       if (!row.id || knownOrderIds.current.has(row.id)) continue;
       knownOrderIds.current.add(row.id);
       if (!notifBaseline.current) continue;      // skip pre-existing on first load
       if (row.created_by === myId) continue;      // don't notify yourself
-      const items = row.items?.length ? row.items : row.item_name ? [row.item_name] : [];
-      const label = items.length ? `${items[0]}${items.length > 1 ? ` +${items.length - 1}` : ""}` : "barang baru";
-      const id = ++notifSeq.current;
-      setNotifs((n) => [...n, { id, text: `Orderan baru: ${label}` }]);
-      playChirp();
-      setTimeout(() => setNotifs((n) => n.filter((x) => x.id !== id)), 8000);
+      pendingNewOrders.current.push(row);
     }
-  }, [myId]);
+    if (pendingNewOrders.current.length && !flushTimer.current) {
+      flushTimer.current = setTimeout(flushNewOrderNotifs, 400);
+    }
+  }, [myId, flushNewOrderNotifs]);
 
   useEffect(() => {
     if (!canWarehouse) return;
@@ -206,7 +233,17 @@ export default function Home() {
     const channel = supabase
       .channel("app-notif-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload) => {
-        setBellItems((rows) => [payload.new as AppNotification, ...rows].slice(0, 50));
+        // Batch bursts (e.g. a bulk restore) into one setState every ~400ms
+        // instead of one per row.
+        pendingBellItems.current.unshift(payload.new as AppNotification);
+        if (!bellFlushTimer.current) {
+          bellFlushTimer.current = setTimeout(() => {
+            bellFlushTimer.current = null;
+            const batch = pendingBellItems.current;
+            pendingBellItems.current = [];
+            setBellItems((rows) => [...batch, ...rows].slice(0, 50));
+          }, 400);
+        }
       })
       .subscribe();
 
