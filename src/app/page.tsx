@@ -159,13 +159,20 @@ export default function Home() {
       notifBaseline.current = true;
     });
 
-    // Poll (works in foreground; background gets throttled but realtime covers it).
+    // Poll: fallback safety net only (realtime below covers the instant path).
+    // Kept slow and only dispatches "wh-orders-changed" when it actually finds
+    // a new row — a fixed-interval fetch-and-broadcast here was doubling up
+    // with the realtime handler on every open Orderan Gudang panel and
+    // burning Supabase egress quota for no benefit.
     const poll = setInterval(async () => {
       const rows = await listOrders();
       if (!active) return;
+      const before = knownOrderIds.current.size;
       notifyNewOrders(rows);
-      window.dispatchEvent(new CustomEvent("wh-orders-changed"));
-    }, 7000);
+      if (knownOrderIds.current.size !== before) {
+        window.dispatchEvent(new CustomEvent("wh-orders-changed"));
+      }
+    }, 60000);
 
     // Realtime: instant updates (incl. background tabs).
     const channel = supabase
@@ -188,10 +195,11 @@ export default function Home() {
     let active = true;
 
     listNotifications().then((rows) => { if (active) setBellItems(rows); });
+    // Fallback safety net only — realtime below appends new rows instantly.
     const poll = setInterval(async () => {
       const rows = await listNotifications();
       if (active) setBellItems(rows);
-    }, 20000);
+    }, 60000);
 
     const channel = supabase
       .channel("app-notif-rt")
