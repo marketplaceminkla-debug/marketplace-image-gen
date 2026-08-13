@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 
 export type KpiUnit = "number" | "percent" | "currency";
 export type KpiCategory = "proses" | "hasil";
-export const PIC_LIST = ["Rona", "Diza", "Alfin", "Mauren"] as const;
+export const PIC_LIST = ["Rona", "Dina", "Alfin", "Mauren"] as const;
 export type PicName = (typeof PIC_LIST)[number];
 
 export interface KpiIndicator {
@@ -199,7 +199,7 @@ export async function deleteIndicator(id: string) {
 
 /**
  * Sum the "Margin" (category hasil) indicator's actual_value across
- * Rona/Diza/Alfin for a month. Matched by name containing "margin" since
+ * Rona/Dina/Alfin for a month. Matched by name containing "margin" since
  * each PIC's indicator is worded differently (Margin Laptop, Margin
  * Aksesoris (...), Margin All (...)) — there's no shared indicator id.
  */
@@ -207,7 +207,7 @@ async function sumMarginFromOtherPics(month: string): Promise<number> {
   const { data: marginIndicators } = await supabase
     .from("kpi_indicators")
     .select("id")
-    .in("pic_name", ["Rona", "Diza", "Alfin"])
+    .in("pic_name", ["Rona", "Dina", "Alfin"])
     .eq("category", "hasil")
     .eq("is_active", true)
     .ilike("name", "%margin%");

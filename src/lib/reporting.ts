@@ -80,7 +80,7 @@ export function storeReportLabel(s: StoreAccount): string {
 // store names into one line, e.g. "Shopee GADGET KLIK & LENOVO" for Alfin.
 const PIC_REPORT_HEADERS: Record<string, string> = {
   Alfin: "Shopee GADGET KLIK & LENOVO",
-  Diza: "Shopee KLA Aksesoris & Tokped KLA",
+  Dina: "Shopee KLA Aksesoris & Tokped KLA",
   Rona: "Shopee KLA",
 };
 

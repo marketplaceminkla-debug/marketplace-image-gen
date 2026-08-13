@@ -305,7 +305,7 @@ export default function KpiTimPanel() {
                   <ActualInput row={row} onSave={handleSaveActual} />
                   {row.source_field && (
                     <p className="text-[10px] text-slate-500 mt-0.5 text-right">
-                      {row.source_field === "margin_sum" ? "dari Margin Rona+Diza+Alfin" : "dari orderan"}
+                      {row.source_field === "margin_sum" ? "dari Margin Rona+Dina+Alfin" : "dari orderan"}
                     </p>
                   )}
                 </div>
