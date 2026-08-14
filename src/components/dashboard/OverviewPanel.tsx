@@ -77,10 +77,11 @@ export default function OverviewPanel({ onNavigate }: { onNavigate: (v: ViewId) 
   const [picSummaries, setPicSummaries] = useState<PicKpiSummary[]>([]);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [storeMap, setStoreMap] = useState<Map<string, StoreAccount>>(new Map());
-  const month = currentMonth();
+  const [month, setMonth] = useState(currentMonth());
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     Promise.all([loadAllPicKpi(month), listOpenPendingItems(), listStoreAccounts()])
       .then(([summaries, pending, stores]) => {
         if (!active) return;
@@ -113,7 +114,15 @@ export default function OverviewPanel({ onNavigate }: { onNavigate: (v: ViewId) 
           <div className="relative flex items-center gap-6">
             <RadialScore pct={avgPct} />
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mb-1">Overview / KPI</p>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mb-1">Overview / KPI</p>
+                <input
+                  type="month"
+                  value={month}
+                  onChange={(e) => e.target.value && setMonth(e.target.value)}
+                  className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 text-xs focus:outline-none focus:border-brand"
+                />
+              </div>
               <h1 className="text-2xl font-black text-white leading-tight">Total Marketplace</h1>
               <p className="text-sm text-slate-400 mt-0.5">{monthLabel(month)}</p>
               <div className={`inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full border text-xs font-semibold ${avgC.badge}`}>
