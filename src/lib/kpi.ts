@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { fetchAllRows } from "./warehouse";
 
 export type KpiUnit = "number" | "percent" | "currency";
 export type KpiCategory = "proses" | "hasil";
@@ -242,16 +243,23 @@ export async function syncKpiFromOrders(
     const monthStart = `${month}-01`;
     const monthEnd   = `${month}-${String(daysInMonth).padStart(2, "0")}`;
 
-    const { data: orders } = await supabase
-      .from("warehouse_orders")
-      .select("revenue, kombo_hemat")
-      .in("store_account_id", storeIds)
-      .gte("order_date", monthStart)
-      .lte("order_date", monthEnd)
-      .neq("status", "denied");
+    // Mauren covers every store ("ALL STORES") with no pic_name filter — a
+    // month's worth of orders across the whole business can exceed
+    // PostgREST's 1000-row response cap, which silently truncated this
+    // (and undercounted revenue) once order volume grew. Page through it.
+    const orders = await fetchAllRows<{ revenue: number; kombo_hemat: string | null }>((from, to) =>
+      supabase
+        .from("warehouse_orders")
+        .select("revenue, kombo_hemat")
+        .in("store_account_id", storeIds)
+        .gte("order_date", monthStart)
+        .lte("order_date", monthEnd)
+        .neq("status", "denied")
+        .range(from, to)
+    );
 
-    revenue = (orders ?? []).reduce((s: number, o: { revenue: number }) => s + (o.revenue ?? 0), 0);
-    kombo   = (orders ?? []).filter((o: { kombo_hemat: string | null }) => o.kombo_hemat !== null).length;
+    revenue = orders.reduce((s, o) => s + (o.revenue ?? 0), 0);
+    kombo   = orders.filter((o) => o.kombo_hemat !== null).length;
   }
 
   const needsMarginSum = indicators.some((i) => i.source_field === "margin_sum");

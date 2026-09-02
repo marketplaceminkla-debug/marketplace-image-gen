@@ -49,6 +49,26 @@ export interface WarehouseOrder {
   created_at: string;
 }
 
+// PostgREST caps any single response at this many rows (project default,
+// "Max Rows" in API settings) regardless of how the query is written — an
+// unbounded select() silently truncates past it instead of erroring. Any
+// query here that can span a full month across multiple stores needs to
+// page through results with .range() instead of trusting a single call.
+const PAGE_SIZE = 1000;
+
+export async function fetchAllRows<T>(
+  queryFactory: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await queryFactory(from, from + PAGE_SIZE - 1);
+    if (error || !data) break;
+    out.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
 export interface AutoReportData {
   revenue_today: number;
   revenue_total: number;
@@ -68,13 +88,15 @@ export async function getAutoReportDataForStores(storeIds: string[], date: strin
   const dayOfMonth = parseInt(date.split("-")[2]);
   const monthEnd = `${y}-${m}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const [{ data: todayOrders }, { data: monthOrders }] = await Promise.all([
+  const [{ data: todayOrders }, monthOrders] = await Promise.all([
     supabase.from("warehouse_orders").select("revenue, kombo_hemat, items, item_qtys").in("store_account_id", storeIds).eq("order_date", date).neq("status", "denied"),
-    supabase.from("warehouse_orders").select("revenue").in("store_account_id", storeIds).gte("order_date", monthStart).lte("order_date", monthEnd).neq("status", "denied"),
+    fetchAllRows<{ revenue: number }>((from, to) =>
+      supabase.from("warehouse_orders").select("revenue").in("store_account_id", storeIds).gte("order_date", monthStart).lte("order_date", monthEnd).neq("status", "denied").range(from, to)
+    ),
   ]);
 
   const revenue_today = (todayOrders ?? []).reduce((s, o) => s + (o.revenue ?? 0), 0);
-  const revenue_total = (monthOrders ?? []).reduce((s, o) => s + (o.revenue ?? 0), 0);
+  const revenue_total = monthOrders.reduce((s, o) => s + (o.revenue ?? 0), 0);
   const revenue_estimate = dayOfMonth > 0 ? Math.round((revenue_total / dayOfMonth) * daysInMonth) : 0;
   const kombo_garansi = (todayOrders ?? []).filter((o) => o.kombo_hemat === "garansi").length;
   const kombo_non_garansi = (todayOrders ?? []).filter((o) => o.kombo_hemat === "non_garansi").length;
@@ -101,24 +123,27 @@ export async function getAutoReportData(storeAccountId: string, date: string): P
   const dayOfMonth = parseInt(date.split("-")[2]);
   const monthEnd = `${y}-${m}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const [{ data: todayOrders }, { data: monthOrders }] = await Promise.all([
+  const [{ data: todayOrders }, monthOrders] = await Promise.all([
     supabase
       .from("warehouse_orders")
       .select("revenue, kombo_hemat, items, item_qtys")
       .eq("store_account_id", storeAccountId)
       .eq("order_date", date)
       .neq("status", "denied"),
-    supabase
-      .from("warehouse_orders")
-      .select("revenue")
-      .eq("store_account_id", storeAccountId)
-      .gte("order_date", monthStart)
-      .lte("order_date", monthEnd)
-      .neq("status", "denied"),
+    fetchAllRows<{ revenue: number }>((from, to) =>
+      supabase
+        .from("warehouse_orders")
+        .select("revenue")
+        .eq("store_account_id", storeAccountId)
+        .gte("order_date", monthStart)
+        .lte("order_date", monthEnd)
+        .neq("status", "denied")
+        .range(from, to)
+    ),
   ]);
 
   const revenue_today = (todayOrders ?? []).reduce((s, o) => s + (o.revenue ?? 0), 0);
-  const revenue_total = (monthOrders ?? []).reduce((s, o) => s + (o.revenue ?? 0), 0);
+  const revenue_total = monthOrders.reduce((s, o) => s + (o.revenue ?? 0), 0);
   const revenue_estimate = dayOfMonth > 0 ? Math.round((revenue_total / dayOfMonth) * daysInMonth) : 0;
 
   const kombo_garansi = (todayOrders ?? []).filter((o) => o.kombo_hemat === "garansi").length;
@@ -148,16 +173,19 @@ export async function getTopProducts(storeAccountId: string, year: number, month
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const { data } = await supabase
-    .from("warehouse_orders")
-    .select("items, item_qtys")
-    .eq("store_account_id", storeAccountId)
-    .gte("order_date", monthStart)
-    .lte("order_date", monthEnd)
-    .neq("status", "denied");
+  const data = await fetchAllRows<{ items: string[] | null; item_qtys: number[] | null }>((from, to) =>
+    supabase
+      .from("warehouse_orders")
+      .select("items, item_qtys")
+      .eq("store_account_id", storeAccountId)
+      .gte("order_date", monthStart)
+      .lte("order_date", monthEnd)
+      .neq("status", "denied")
+      .range(from, to)
+  );
 
   const map = new Map<string, number>();
-  for (const o of data ?? []) {
+  for (const o of data) {
     const names: string[] = o.items?.length ? o.items : [];
     const qtys: number[] = o.item_qtys ?? [];
     for (let i = 0; i < names.length; i++) {
@@ -280,11 +308,18 @@ export async function searchOrdersByOrderNumber(query: string, limit = 15): Prom
   return data as WarehouseOrder[];
 }
 
+// Once warehouse_orders crossed 1000 rows, an unbounded select() here was
+// quietly dropping every older row (all of July, some of August) from the
+// app — orders were never deleted, just never fetched past PostgREST's cap.
+function selectAllPages<T>(select: string): Promise<T[]> {
+  return fetchAllRows<T>((from, to) =>
+    supabase.from("warehouse_orders").select(select).order("created_at", { ascending: false }).range(from, to)
+  );
+}
+
 // ── Orders ──
 export async function listOrders(): Promise<WarehouseOrder[]> {
-  const { data, error } = await supabase.from("warehouse_orders").select("*").order("created_at", { ascending: false });
-  if (error || !data) return [];
-  return data as WarehouseOrder[];
+  return selectAllPages<WarehouseOrder>("*");
 }
 
 export interface OrderNotifyRow {
@@ -297,16 +332,10 @@ export interface OrderNotifyRow {
 /**
  * Minimal-column version of listOrders(), used by the "new order" toast/sound
  * poll — that only needs id/creator/item name to diff against known ids, not
- * every column on every row. Full-table `select("*")` on a fixed interval was
- * the single biggest driver of Supabase egress in this app.
+ * every column on every row.
  */
 export async function listOrdersForNotify(): Promise<OrderNotifyRow[]> {
-  const { data, error } = await supabase
-    .from("warehouse_orders")
-    .select("id, created_by, item_name, items")
-    .order("created_at", { ascending: false });
-  if (error || !data) return [];
-  return data as OrderNotifyRow[];
+  return selectAllPages<OrderNotifyRow>("id, created_by, item_name, items");
 }
 /** Orders filtered by store account and date — used by Report Harian to sync deals. */
 export async function listOrdersByStore(storeAccountId: string, date: string): Promise<WarehouseOrder[]> {
