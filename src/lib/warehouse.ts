@@ -312,8 +312,9 @@ export async function searchOrdersByOrderNumber(query: string, limit = 15): Prom
 // quietly dropping every older row (all of July, some of August) from the
 // app — orders were never deleted, just never fetched past PostgREST's cap.
 function selectAllPages<T>(select: string): Promise<T[]> {
-  return fetchAllRows<T>((from, to) =>
-    supabase.from("warehouse_orders").select(select).order("created_at", { ascending: false }).range(from, to)
+  return fetchAllRows<T>(
+    (from, to) =>
+      supabase.from("warehouse_orders").select(select).order("created_at", { ascending: false }).range(from, to) as unknown as PromiseLike<{ data: T[] | null; error: unknown }>
   );
 }
 
