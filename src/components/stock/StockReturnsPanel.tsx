@@ -7,7 +7,7 @@ import { Warehouse, WarehouseOrder, listWarehouses, SO_RE, formatSo, searchOrder
 import { StoreAccount, listStoreAccounts, storeDisplayName, formatIDR } from "@/lib/reporting";
 import {
   StockReturn, ReturnCategory, ReturnStatus,
-  CATEGORY_LABEL, STATUS_LABEL, returnItems, nextRcNumber,
+  CATEGORY_LABEL, STATUS_LABEL, returnItems, nextRcNumber, findDuplicateByOrderNumber,
   listStockReturns, addStockReturn, updateStockReturn, deleteStockReturn,
 } from "@/lib/stockReturns";
 import MultiSelectFilter from "@/components/ui/MultiSelectFilter";
@@ -111,6 +111,15 @@ export default function StockReturnsPanel() {
 
   const whMap = useMemo(() => new Map(warehouses.map((w) => [w.id, w])), [warehouses]);
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
+
+  // Guard against filing the same order's retur twice — check by Nomor
+  // Pesanan against everything already in the table, whichever add mode
+  // (cari orderan vs input manual) is active.
+  const activeOrderNo = addMode === "search" ? (selectedOrder?.order_number ?? "") : mOrderNo;
+  const duplicateReturn = useMemo(
+    () => findDuplicateByOrderNumber(returns, activeOrderNo),
+    [returns, activeOrderNo],
+  );
   const shown = useMemo(() => returns.filter((r) => {
     if (statusFilter.size && !statusFilter.has(r.status)) return false;
     if (whFilter.size && !whFilter.has(r.warehouse_id ?? "")) return false;
@@ -156,6 +165,7 @@ export default function StockReturnsPanel() {
 
     if (addMode === "search") {
       if (!selectedOrder) { setError("Cari & pilih orderan yang mau diretur dulu."); return; }
+      if (duplicateReturn) { setError(`Nomor Pesanan ${selectedOrder.order_number} udah pernah diinput retur-nya (status: ${STATUS_LABEL[duplicateReturn.status]}). Gak bisa diinput dobel.`); return; }
       setBusy(true);
       const list = orderItems(selectedOrder);
       const { error } = await addStockReturn({
@@ -186,6 +196,7 @@ export default function StockReturnsPanel() {
     const cleanItems = mItems.map((it) => ({ name: it.name.trim(), qty: Math.max(1, Math.round(it.qty) || 1) })).filter((it) => it.name);
     if (cleanItems.length === 0) { setError("Isi minimal 1 nama barang dulu."); return; }
     if (mSo.trim() && !SO_RE.test(mSo.trim())) { setError("Format Nomor SO harus lengkap: SO/12345/123456 (5 digit lalu 6 digit)."); return; }
+    if (duplicateReturn) { setError(`Nomor Pesanan ${mOrderNo.trim()} udah pernah diinput retur-nya (status: ${STATUS_LABEL[duplicateReturn.status]}). Gak bisa diinput dobel.`); return; }
     setBusy(true);
     const { error } = await addStockReturn({
       return_date: returnDate || todayISO(),
@@ -460,8 +471,19 @@ export default function StockReturnsPanel() {
                 </div>
               )}
 
+              {duplicateReturn && (
+                <div className="flex items-start gap-2 bg-danger-light border border-danger/30 text-danger text-xs rounded-xl px-3 py-2.5 mt-3">
+                  <PackageX size={14} className="shrink-0 mt-0.5" />
+                  <span>
+                    Nomor Pesanan <b>{activeOrderNo}</b> udah pernah diinput retur-nya
+                    (status: {STATUS_LABEL[duplicateReturn.status]}, RC {duplicateReturn.rc_number || "-"}).
+                    Gak bisa diinput dobel — cek dulu di daftar bawah.
+                  </span>
+                </div>
+              )}
+
               {(addMode === "manual" || (addMode === "search" && selectedOrder)) && (
-                <button type="submit" disabled={busy} className="btn-bounce mt-3 px-4 py-2 rounded-lg bg-brand hover:bg-brand-hover text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                <button type="submit" disabled={busy || !!duplicateReturn} className="btn-bounce mt-3 px-4 py-2 rounded-lg bg-brand hover:bg-brand-hover text-slate-900 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
                   {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah Retur
                 </button>
               )}

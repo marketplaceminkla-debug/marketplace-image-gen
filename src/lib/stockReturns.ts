@@ -57,6 +57,14 @@ export function nextRcNumber(returns: StockReturn[], dateISO: string): string {
   return `RC/${String(max + 1).padStart(5, "0")}/${ym}`;
 }
 
+/** Existing return already filed for this order number, if any — used to
+ * block accidental double-entry of the same retur. */
+export function findDuplicateByOrderNumber(returns: StockReturn[], orderNumber: string): StockReturn | undefined {
+  const q = orderNumber.trim().toLowerCase();
+  if (!q) return undefined;
+  return returns.find((r) => (r.order_number ?? "").trim().toLowerCase() === q);
+}
+
 export interface ReturnItem { name: string; qty: number; }
 
 /** Items of a return (name + qty), falling back to the legacy single item_name. */
