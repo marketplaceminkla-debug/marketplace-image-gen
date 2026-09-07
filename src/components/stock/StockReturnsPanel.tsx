@@ -7,7 +7,7 @@ import { Warehouse, WarehouseOrder, listWarehouses, SO_RE, formatSo, searchOrder
 import { StoreAccount, listStoreAccounts, storeDisplayName, formatIDR } from "@/lib/reporting";
 import {
   StockReturn, ReturnCategory, ReturnStatus,
-  CATEGORY_LABEL, STATUS_LABEL, returnItems,
+  CATEGORY_LABEL, STATUS_LABEL, returnItems, nextRcNumber,
   listStockReturns, addStockReturn, updateStockReturn, deleteStockReturn,
 } from "@/lib/stockReturns";
 import MultiSelectFilter from "@/components/ui/MultiSelectFilter";
@@ -52,7 +52,17 @@ export default function StockReturnsPanel() {
   const [category, setCategory] = useState<ReturnCategory>("tukar_unit");
   const [reason, setReason] = useState("");
   const [rc, setRc] = useState("");
+  const [rcTouched, setRcTouched] = useState(false); // false = still auto-suggested, true = staff typed their own
   const [busy, setBusy] = useState(false);
+
+  // Auto-suggest the next RC number for whichever month `returnDate` falls
+  // in, so staff don't have to track the sequence by hand — the count is
+  // scoped per YYYYMM, so it starts back at 00001 every new month. Stops
+  // touching the field the moment staff edits it themselves.
+  useEffect(() => {
+    if (rcTouched) return;
+    setRc(nextRcNumber(returns, returnDate || todayISO()));
+  }, [returns, returnDate, rcTouched]);
 
   // Manual entry fields
   const [mWarehouseId, setMWarehouseId] = useState("");
@@ -136,7 +146,7 @@ export default function StockReturnsPanel() {
   const removeMItemRow = (i: number) => setMItems((arr) => (arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)));
 
   function resetAddForm() {
-    setSelectedOrder(null); setCategory("tukar_unit"); setReason(""); setRc(""); setReturnDate(todayISO());
+    setSelectedOrder(null); setCategory("tukar_unit"); setReason(""); setRcTouched(false); setReturnDate(todayISO());
     setMSo(""); setMOrderNo(""); setMRevenue(""); setMStoreAccountId(""); setMItems([{ name: "", qty: 1 }]);
   }
 
@@ -428,8 +438,13 @@ export default function StockReturnsPanel() {
                       {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
                     </select>
                   </Labeled>
-                  <Labeled label="Nomor RC (opsional)">
-                    <input value={rc} onChange={(e) => setRc(e.target.value)} placeholder="Nomor RC" className={INPUT} />
+                  <Labeled label="Nomor RC (otomatis per bulan, bisa diedit)">
+                    <input
+                      value={rc}
+                      onChange={(e) => { setRc(e.target.value); setRcTouched(true); }}
+                      placeholder="Nomor RC"
+                      className={INPUT}
+                    />
                   </Labeled>
                   <div />
                   <div className="md:col-span-2">

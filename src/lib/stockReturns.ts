@@ -40,6 +40,23 @@ export interface StockReturn {
   created_at: string;
 }
 
+/**
+ * Next auto-numbered RC code for the month of `dateISO`: RC/#####/YYYYMM.
+ * Sequence is scoped to that month, so it naturally resets to 00001 once
+ * the month rolls over — no separate counter table needed, just look at
+ * the highest existing rc_number tagged with the same YYYYMM.
+ */
+export function nextRcNumber(returns: StockReturn[], dateISO: string): string {
+  const ym = dateISO.slice(0, 7).replace("-", "");
+  const re = new RegExp(`^RC/(\\d+)/${ym}$`);
+  let max = 0;
+  for (const r of returns) {
+    const m = r.rc_number?.match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `RC/${String(max + 1).padStart(5, "0")}/${ym}`;
+}
+
 export interface ReturnItem { name: string; qty: number; }
 
 /** Items of a return (name + qty), falling back to the legacy single item_name. */
