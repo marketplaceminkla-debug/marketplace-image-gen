@@ -40,6 +40,7 @@ export default function StockReturnsPanel() {
   const [statusFilter, setStatusFilter] = useState<Set<ReturnStatus>>(new Set());
   const [whFilter, setWhFilter] = useState<Set<string>>(new Set());
   const [storeFilter, setStoreFilter] = useState<Set<string>>(new Set());
+  const [monthFilter, setMonthFilter] = useState(""); // "" = semua bulan; "YYYY-MM" = bulan tertentu
 
   // Add form: cari orderan yang mau diretur (default), atau input manual
   // (mis. buat data lama yang orderannya udah gak ada di sistem).
@@ -121,11 +122,12 @@ export default function StockReturnsPanel() {
     [returns, activeOrderNo],
   );
   const shown = useMemo(() => returns.filter((r) => {
+    if (monthFilter && r.return_date.slice(0, 7) !== monthFilter) return false;
     if (statusFilter.size && !statusFilter.has(r.status)) return false;
     if (whFilter.size && !whFilter.has(r.warehouse_id ?? "")) return false;
     if (storeFilter.size && !storeFilter.has(r.store_account_id ?? "")) return false;
     return true;
-  }), [returns, statusFilter, whFilter, storeFilter]);
+  }), [returns, monthFilter, statusFilter, whFilter, storeFilter]);
 
   // Cari orderan by Nomor Pesanan (debounced) buat diambil datanya.
   useEffect(() => {
@@ -280,13 +282,29 @@ export default function StockReturnsPanel() {
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
       <div className="px-6 md:px-10 py-6 md:py-8 max-w-4xl">
-        <div className="flex items-start gap-4 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-brand-light flex items-center justify-center shrink-0 border border-brand-muted">
-            <PackageX size={24} className="text-brand-hover" />
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-brand-light flex items-center justify-center shrink-0 border border-brand-muted">
+              <PackageX size={24} className="text-brand-hover" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900">Retur &amp; Gagal Kirim</h1>
+              <p className="text-sm text-slate-500 mt-1">Catat & pantau pesanan retur atau gagal kirim, dari input sampai selesai.</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900">Retur &amp; Gagal Kirim</h1>
-            <p className="text-sm text-slate-500 mt-1">Catat & pantau pesanan retur atau gagal kirim, dari input sampai selesai.</p>
+          <div className="shrink-0">
+            <label className="text-[11px] text-slate-500 block mb-1 text-right">Bulan</label>
+            <input
+              type="month"
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:border-brand"
+            />
+            {monthFilter && (
+              <button type="button" onClick={() => setMonthFilter("")} className="block ml-auto mt-1 text-[11px] text-slate-400 hover:text-danger">
+                Reset (semua bulan)
+              </button>
+            )}
           </div>
         </div>
 
@@ -536,7 +554,7 @@ export default function StockReturnsPanel() {
               <p className="text-sm text-slate-400 py-10 text-center">Belum ada retur di kategori ini.</p>
             ) : (
               <div className="space-y-2">
-                {shown.map((r) => {
+                {shown.map((r, idx) => {
                   const isEditing = editingId === r.id;
                   const wh = r.warehouse_id ? whMap.get(r.warehouse_id) : undefined;
 
@@ -619,6 +637,9 @@ export default function StockReturnsPanel() {
                   return (
                     <div key={r.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3">
                       <div className="flex items-start gap-3">
+                        <span className="shrink-0 w-6 h-6 mt-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center">
+                          {idx + 1}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-slate-900 truncate">{list.length === 0 ? "-" : list.length > 1 ? `${list[0].name} +${list.length - 1}` : `${list[0].name}${list[0].qty > 1 ? ` ×${list[0].qty}` : ""}`}</p>
