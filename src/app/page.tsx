@@ -282,8 +282,13 @@ export default function Home() {
   // ── Auth gates ──
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-main-bg">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 bg-main-bg">
         <Loader2 size={22} className="animate-spin text-slate-400" />
+        {/* Pure-CSS delayed hint: still shows up even if the browser can't run the app's JavaScript. */}
+        <div className="loading-hint max-w-sm text-center text-xs text-slate-500 leading-relaxed">
+          <p className="font-semibold text-slate-700 mb-1">Loading-nya lama banget?</p>
+          <p>Cek jam &amp; tanggal laptop sudah benar, update browser (Chrome/Edge terbaru), lalu coba buka di jendela Incognito. Kalau masih, coba pakai hotspot HP.</p>
+        </div>
       </div>
     );
   }

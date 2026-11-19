@@ -50,10 +50,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
+    // Never spin forever: if Supabase can't be reached (bad network, wrong
+    // laptop clock, blocked domain), fall through to the login screen after
+    // 10s, which then shows the real error when the user tries to sign in.
+    const giveUp = setTimeout(() => { if (active) setLoading(false); }, 10000);
+
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
       await loadProfile(data.session);
+      clearTimeout(giveUp);
+      if (active) setLoading(false);
+    }).catch(() => {
+      clearTimeout(giveUp);
       if (active) setLoading(false);
     });
 
@@ -65,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
+      clearTimeout(giveUp);
       sub.subscription.unsubscribe();
     };
   }, [loadProfile]);

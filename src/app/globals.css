@@ -702,3 +702,7 @@ select option {
     @apply border-brand bg-brand-light;
   }
 }
+
+/* Loading screen hint — appears after 12s via CSS only, so it works even when JS fails */
+.loading-hint { opacity: 0; animation: loading-hint-in 0.4s ease-out 12s forwards; }
+@keyframes loading-hint-in { to { opacity: 1; } }
