@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check, Search, FileSpreadsheet } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { ClipboardList, Plus, Loader2, Trash2, Send, Paperclip, Download, CheckSquare, Square, X, Pencil, Check, Search, FileSpreadsheet, Printer } from "lucide-react";
+import { useAuth, isResiOnly } from "@/lib/auth";
 import {
   Warehouse, WarehouseOrder, Ekspedisi, Shipment, OrderStatus,
   STATUS_LABEL, EKSPEDISI_LABEL, SHIPMENT_LABEL, orderItems,
@@ -35,6 +35,8 @@ function todayISO() {
 
 export default function WarehouseOrdersPanel() {
   const { profile } = useAuth();
+  // Interns: view orders + open/print resi only — no input, edit, delete, WA, or revenue export.
+  const readOnly = isResiOnly(profile);
 
   const [storeAccounts, setStoreAccounts] = useState<StoreAccount[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -391,7 +393,9 @@ export default function WarehouseOrdersPanel() {
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900">Orderan Gudang</h1>
-            <p className="text-sm text-slate-500 mt-1">Input order, centang yang mau dikirim, lalu kirim WA gabungan per gudang.</p>
+            <p className="text-sm text-slate-500 mt-1">
+              {readOnly ? "Cari order, lalu klik Print resi buat cetak." : "Input order, centang yang mau dikirim, lalu kirim WA gabungan per gudang."}
+            </p>
           </div>
         </div>
 
@@ -404,6 +408,7 @@ export default function WarehouseOrdersPanel() {
         ) : (
           <>
             {/* Add form */}
+            {!readOnly && (
             <form onSubmit={handleAdd} className="glass-card rounded-2xl p-4 md:p-5 mb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
                 <Labeled label="Gudang tujuan">
@@ -499,6 +504,7 @@ export default function WarehouseOrdersPanel() {
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah Order
               </button>
             </form>
+            )}
 
             {/* Search + export */}
             <div className="flex items-center gap-2 mb-3">
@@ -516,6 +522,7 @@ export default function WarehouseOrdersPanel() {
                   </button>
                 )}
               </div>
+              {!readOnly && (
               <button
                 onClick={handleExportExcel}
                 disabled={shown.length === 0}
@@ -524,6 +531,7 @@ export default function WarehouseOrdersPanel() {
               >
                 <FileSpreadsheet size={15} className="text-success" /> Export Excel
               </button>
+              )}
             </div>
 
             {/* Filters — multi-select dropdowns */}
@@ -605,6 +613,7 @@ export default function WarehouseOrdersPanel() {
                           </span>
                           <span className="text-xs font-normal text-slate-400">({ords.length})</span>
                         </button>
+                        {!readOnly && (
                         <button
                           onClick={() => send(wh, ords.filter((o) => selected.has(o.id)))}
                           disabled={selCount === 0}
@@ -612,6 +621,7 @@ export default function WarehouseOrdersPanel() {
                         >
                           <Send size={13} /> Kirim WA{selCount > 0 ? ` (${selCount})` : ""}
                         </button>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -727,6 +737,11 @@ export default function WarehouseOrdersPanel() {
                                     {list.length > 1 && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-kla-purpleLight text-kla-purple">{list.length} barang</span>}
                                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLE[o.status]}`}>{STATUS_LABEL[o.status]}</span>
                                     {o.resi_url && (
+                                      <a href={o.resi_url} target="_blank" rel="noopener noreferrer" className="text-[11px] inline-flex items-center gap-1 text-brand-hover hover:underline">
+                                        <Printer size={11} /> Print resi
+                                      </a>
+                                    )}
+                                    {o.resi_url && (
                                       <button onClick={() => downloadResi(o)} className="text-[11px] inline-flex items-center gap-1 text-brand-hover hover:underline">
                                         <Download size={11} /> Download resi
                                       </button>
@@ -736,6 +751,7 @@ export default function WarehouseOrdersPanel() {
                                   <p className="text-sm text-slate-500 mt-1">{o.order_date ? `${o.order_date} · ` : ""}SO {o.so_number || "-"} · Pesanan {o.order_number || "-"}</p>
                                   <p className="text-sm text-slate-500 mt-0.5">{EKSPEDISI_LABEL[o.ekspedisi]} · {SHIPMENT_LABEL[o.shipment]}{o.keterangan ? ` · ${o.keterangan}` : ""}</p>
 
+                                  {!readOnly && (
                                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                                     <button onClick={() => send(wh, [o])} className="inline-flex items-center gap-1 text-xs font-medium text-success hover:underline">
                                       <Send size={13} /> Kirim 1 ini
@@ -752,8 +768,11 @@ export default function WarehouseOrdersPanel() {
                                       {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                                     </select>
                                   </div>
+                                  )}
                                 </div>
-                                <button onClick={() => handleDelete(o.id)} className="text-slate-300 hover:text-danger shrink-0"><Trash2 size={15} /></button>
+                                {!readOnly && (
+                                  <button onClick={() => handleDelete(o.id)} className="text-slate-300 hover:text-danger shrink-0"><Trash2 size={15} /></button>
+                                )}
                               </div>
                             </div>
                           );

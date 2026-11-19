@@ -3,13 +3,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Users, RefreshCw, Loader2, Check, UserPlus, Copy, X, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth, type Profile, type Role } from "@/lib/auth";
+import { useAuth, RESI_ONLY, type Profile, type Role } from "@/lib/auth";
 import { listWarehouses, type Warehouse } from "@/lib/warehouse";
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard" },
   { id: "product", label: "Product Listing" },
   { id: "warehouse", label: "Multiwarehouse" },
+  { id: RESI_ONLY, label: "Multiwarehouse: cuma lihat & print resi" },
   { id: "stock", label: "Stock Management" },
   { id: "tools", label: "Tools" },
 ];
@@ -73,9 +74,7 @@ export default function UserManagementPanel() {
   }
 
   function toggleAccess(row: Profile, sectionId: string) {
-    const has = row.access.includes(sectionId);
-    const access = has ? row.access.filter((a) => a !== sectionId) : [...row.access, sectionId];
-    update(row.id, { access });
+    update(row.id, { access: nextAccess(row.access, sectionId) });
   }
 
   function toggleWarehouseScope(row: Profile, whId: string) {
@@ -86,7 +85,7 @@ export default function UserManagementPanel() {
   }
 
   function toggleNewAccess(sectionId: string) {
-    setNewAccess((a) => (a.includes(sectionId) ? a.filter((x) => x !== sectionId) : [...a, sectionId]));
+    setNewAccess((a) => nextAccess(a, sectionId));
   }
 
   function toggleNewWarehouseScope(whId: string) {
@@ -520,4 +519,16 @@ export default function UserManagementPanel() {
       )}
     </div>
   );
+}
+
+/** Toggle one access id. "resi_only" rides on top of "warehouse" (the database
+ *  rules check "warehouse"), so turning it on adds "warehouse" too, and
+ *  removing "warehouse" also removes "resi_only". */
+function nextAccess(access: string[], sectionId: string): string[] {
+  if (access.includes(sectionId)) {
+    const removed = access.filter((a) => a !== sectionId);
+    return sectionId === "warehouse" ? removed.filter((a) => a !== RESI_ONLY) : removed;
+  }
+  const added = [...access, sectionId];
+  return sectionId === RESI_ONLY && !added.includes("warehouse") ? [...added, "warehouse"] : added;
 }

@@ -107,3 +107,11 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+
+/** Access flag (stored in profiles.access alongside "warehouse") for accounts
+ *  that may only view Multiwarehouse orders and open/print resi — e.g. interns. */
+export const RESI_ONLY = "resi_only";
+
+export function isResiOnly(profile: Profile | null): boolean {
+  return !!profile && profile.role !== "super_admin" && profile.access.includes(RESI_ONLY);
+}

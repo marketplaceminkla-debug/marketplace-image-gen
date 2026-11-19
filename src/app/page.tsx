@@ -28,7 +28,7 @@ import StockReturnsPanel from "@/components/stock/StockReturnsPanel";
 import { getActiveTemplate } from "@/lib/imageProcessor";
 import { ProductImage } from "@/types";
 import { NAV, ADMIN_SECTION, ViewId, findSection, viewHref, type NavSection } from "@/components/layout/workspaceNav";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isResiOnly } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { listOrdersForNotify } from "@/lib/warehouse";
 import { unlockAudio, playChirp } from "@/lib/notifSound";
@@ -116,7 +116,10 @@ export default function Home() {
   const visibleSections = useMemo<NavSection[]>(() => {
     if (!profile) return [];
     if (profile.role === "super_admin") return [...NAV, ADMIN_SECTION];
-    return NAV.filter((s) => profile.access.includes(s.id));
+    const allowed = NAV.filter((s) => profile.access.includes(s.id));
+    // Resi-only accounts (interns) see just the order list, not Database Gudang.
+    if (!isResiOnly(profile)) return allowed;
+    return allowed.map((s) => (s.id === "warehouse" ? { ...s, items: s.items.filter((i) => i.id === "wh-orders") } : s));
   }, [profile]);
 
   // If the current view isn't allowed (e.g. a stale/foreign URL), jump to
