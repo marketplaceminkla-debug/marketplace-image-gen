@@ -31,6 +31,14 @@ export interface DailySalesReport {
   kombo_non_garansi: number;
   kombo_garansi: number;
   loss_notes: string | null;
+  // Template v2 (supabase-report-template-v2.sql)
+  live_revenue: number;
+  unit_laptop: number;
+  unit_aksesoris: number;
+  video_count: number;
+  ops_unboxing_retur: number;
+  ops_service_count: number;
+  ops_cases: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -317,6 +325,39 @@ export async function listMonthlyStats(
   return Object.values(byMonth).sort((a, b) => a.month - b.month);
 }
 
+// ── Operasional (all stores, auto) ──────────────────────────
+export interface OpsAutoData {
+  orders_today: number;     // semua orderan hari itu (kecuali denied)
+  orders_shipped: number;   // yang statusnya Done
+  orders_pending: number;   // yang belum Done
+  retur_today: number;      // retur yang masuk hari itu
+  retur_unprocessed: number; // retur status New (semua tanggal)
+}
+
+export async function getOpsAutoData(date: string): Promise<OpsAutoData> {
+  const count = async (q: PromiseLike<{ count: number | null }>) => (await q).count ?? 0;
+  const orders = () => supabase.from("warehouse_orders").select("id", { count: "exact", head: true }).eq("order_date", date).neq("status", "denied");
+  const returns = () => supabase.from("stock_returns").select("id", { count: "exact", head: true });
+  const [orders_today, orders_shipped, retur_today, retur_unprocessed] = await Promise.all([
+    count(orders()),
+    count(orders().eq("status", "done")),
+    count(returns().eq("return_date", date)),
+    count(returns().eq("status", "new")),
+  ]);
+  return { orders_today, orders_shipped, orders_pending: orders_today - orders_shipped, retur_today, retur_unprocessed };
+}
+
+export interface ReportManualFields {
+  liveRevenue: number;
+  unitLaptop: number;
+  unitAksesoris: number;
+  videoCount: number;
+  lossNotes: string;
+  opsUnboxingRetur: number;
+  opsServiceCount: number;
+  opsCases: string;
+}
+
 // ── WA Report Generator ─────────────────────────────────────
 export function buildReportWaMessage(
   store: StoreAccount,
@@ -357,44 +398,70 @@ export function buildReportWaMessage(
   );
 }
 
-/** Build WA report for a PIC (aggregates all their stores). */
+/** Build WA report for a PIC (aggregates all their stores) — template v2:
+ *  Tim Penjualan + Operasional. */
 export function buildPicWaMessage(
   picName: string,
   stores: StoreAccount[],
-  report: DailySalesReport | null,
-  autoData: { revenue_today: number; revenue_total: number; revenue_estimate: number; deal_qty: number; kombo_garansi: number; kombo_non_garansi: number; deals: { name: string; qty: number }[] },
-  pendingItems: PendingItem[],
+  autoData: { revenue_today: number; revenue_total: number; revenue_estimate: number; order_count: number },
+  ops: OpsAutoData | null,
+  pendingCount: number,
   target: number,
   date: string,
-  chatCount: number,
-  uploadCount: number,
-  lossNotes: string,
+  manual: ReportManualFields,
 ): string {
   const [y, m, d] = date.split("-");
   const dateStr = `${d}/${m}/${y}`;
   const header = picReportHeader(picName, stores);
-  const dealLines = autoData.deals.length
-    ? autoData.deals.map((dd) => `${dd.qty} unit\t${dd.name}`).join("\n")
-    : "-";
-  const openPending = pendingItems.filter((p) => p.status === "pending");
-  const pendingLines = openPending.length
-    ? openPending.map((p, i) => `${i + 1}. ${p.product_name}`).join("\n")
-    : "-";
+  const n = (v: number) => (v > 0 ? String(v) : "-");
+  const list = (text: string) => (text.trim() ? `
+${text.trim()}` : " -");
   return (
-    `Report ${header} ${dateStr}\n\n` +
-    `TARGET : ${formatIDR(target)}\n` +
-    `Total Revenue : ${formatIDR(autoData.revenue_total)}\n` +
-    `Revenue Hari Ini : ${formatIDR(autoData.revenue_today)}\n` +
-    `Estimasi Revenue : ${formatIDR(autoData.revenue_estimate)}\n\n` +
-    `Chat : ${chatCount}\n` +
-    `Deal : ${autoData.deal_qty}\n` +
-    `${dealLines}\n\n` +
-    `Upload produk : ${uploadCount > 0 ? uploadCount : "-"}\n\n` +
-    `Kombo Hemat\n` +
-    `Non Garansi : ${autoData.kombo_non_garansi > 0 ? autoData.kombo_non_garansi : "-"}\n` +
-    `Garansi : ${autoData.kombo_garansi > 0 ? autoData.kombo_garansi : "-"}\n\n` +
-    `Pending :\n${pendingLines}\n\n` +
-    `Loss : ${lossNotes || "-"}`
+    `Report ${header} ${dateStr}
+
+` +
+    `Tim Penjualan : ${header}
+` +
+    `Target Revenue : ${formatIDR(target)}
+` +
+    `Revenue Hari ini : ${formatIDR(autoData.revenue_today)}
+` +
+    `Total Revenue : ${formatIDR(autoData.revenue_total)}
+` +
+    `Estimasi Revenue Akhir Bulan : ${formatIDR(autoData.revenue_estimate)}
+` +
+    `Total Revenue dari Live : ${manual.liveRevenue > 0 ? formatIDR(manual.liveRevenue) : "-"}
+` +
+    `Total Unit Laptop : ${n(manual.unitLaptop)}
+` +
+    `Total Unit Aksesoris : ${n(manual.unitAksesoris)}
+` +
+    `Jumlah Orderan : ${n(autoData.order_count)}
+` +
+    `Jumlah Pending belum SO : ${n(pendingCount)}
+` +
+    `Jumlah Vidio yang di Upload : ${n(manual.videoCount)}
+` +
+    `Loss :${list(manual.lossNotes)}
+
+` +
+    `Operasional :
+` +
+    `Total Jumlah Order Hari ini : ${n(ops?.orders_today ?? 0)}
+` +
+    `Total Pesanan Terkirim : ${n(ops?.orders_shipped ?? 0)}
+` +
+    `Total Pesanan Pending : ${n(ops?.orders_pending ?? 0)}
+` +
+    `Total Retur Yang Masuk : ${n(ops?.retur_today ?? 0)}
+` +
+    `Total Unboxing Vidio Retur : ${n(manual.opsUnboxingRetur)}
+` +
+    `Retur yang belum di Proses : ${n(ops?.retur_unprocessed ?? 0)}
+` +
+    `Total Barang Service : ${n(manual.opsServiceCount)}
+` +
+    `Case Operasional yang Muncul :${list(manual.opsCases)}`
   );
 }
 

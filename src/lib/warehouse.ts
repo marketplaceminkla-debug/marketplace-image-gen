@@ -74,6 +74,7 @@ export interface AutoReportData {
   revenue_total: number;
   revenue_estimate: number;
   deal_qty: number;
+  order_count: number; // number of (non-denied) orders that day
   kombo_garansi: number;
   kombo_non_garansi: number;
   deals: { name: string; qty: number }[];
@@ -81,7 +82,7 @@ export interface AutoReportData {
 
 /** Aggregate order data across multiple stores (PIC-level). */
 export async function getAutoReportDataForStores(storeIds: string[], date: string): Promise<AutoReportData> {
-  if (!storeIds.length) return { revenue_today: 0, revenue_total: 0, revenue_estimate: 0, deal_qty: 0, kombo_garansi: 0, kombo_non_garansi: 0, deals: [] };
+  if (!storeIds.length) return { revenue_today: 0, revenue_total: 0, revenue_estimate: 0, deal_qty: 0, order_count: 0, kombo_garansi: 0, kombo_non_garansi: 0, deals: [] };
   const [y, m] = date.split("-");
   const monthStart = `${y}-${m}-01`;
   const daysInMonth = new Date(parseInt(y), parseInt(m), 0).getDate();
@@ -112,7 +113,8 @@ export async function getAutoReportDataForStores(storeIds: string[], date: strin
   }
   const deals = Array.from(dealMap.entries()).map(([name, qty]) => ({ name, qty }));
   const deal_qty = deals.reduce((s, d) => s + d.qty, 0);
-  return { revenue_today, revenue_total, revenue_estimate, deal_qty, kombo_garansi, kombo_non_garansi, deals };
+  const order_count = (todayOrders ?? []).length;
+  return { revenue_today, revenue_total, revenue_estimate, deal_qty, order_count, kombo_garansi, kombo_non_garansi, deals };
 }
 
 /** Aggregate order data for Report Harian auto-calculation. */
@@ -162,7 +164,8 @@ export async function getAutoReportData(storeAccountId: string, date: string): P
   const deals = Array.from(dealMap.entries()).map(([name, qty]) => ({ name, qty }));
   const deal_qty = deals.reduce((s, d) => s + d.qty, 0);
 
-  return { revenue_today, revenue_total, revenue_estimate, deal_qty, kombo_garansi, kombo_non_garansi, deals };
+  const order_count = (todayOrders ?? []).length;
+  return { revenue_today, revenue_total, revenue_estimate, deal_qty, order_count, kombo_garansi, kombo_non_garansi, deals };
 }
 
 export interface TopProduct { name: string; qty: number; }

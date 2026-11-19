@@ -11,7 +11,7 @@ import {
   listStoreAccounts, getDailyReport, upsertDailyReport,
   listPendingItemsForStores, addPendingItem, updatePendingItem, updatePendingStatus, deletePendingItem,
   getMonthlyTarget, setMonthlyTarget,
-  formatIDR, buildPicWaMessage,
+  formatIDR, buildPicWaMessage, getOpsAutoData, OpsAutoData,
 } from "@/lib/reporting";
 import { getAutoReportDataForStores, AutoReportData } from "@/lib/warehouse";
 
@@ -51,7 +51,14 @@ export default function ReportHarianPanel() {
   const [targetInput, setTargetInput] = useState("");
 
   const [chatCount, setChatCount] = useState("");
-  const [uploadCount, setUploadCount] = useState("");
+  const [liveRevenue, setLiveRevenue] = useState("");
+  const [unitLaptop, setUnitLaptop] = useState("");
+  const [unitAksesoris, setUnitAksesoris] = useState("");
+  const [videoCount, setVideoCount] = useState("");
+  const [opsUnboxing, setOpsUnboxing] = useState("");
+  const [opsService, setOpsService] = useState("");
+  const [opsCases, setOpsCases] = useState("");
+  const [ops, setOps] = useState<OpsAutoData | null>(null);
   const [lossItems, setLossItems] = useState<string[]>([]);
   const [newLossItem, setNewLossItem] = useState("");
 
@@ -86,12 +93,14 @@ export default function ReportHarianPanel() {
     setError(null);
 
     const storeIds = myStores.map((s) => s.id);
-    const [rep, t, auto, pending] = await Promise.all([
+    const [rep, t, auto, pending, opsData] = await Promise.all([
       getDailyReport(primaryId, date),
       getMonthlyTarget(picName, parseInt(date.split("-")[1]), parseInt(date.split("-")[0])),
       getAutoReportDataForStores(storeIds, date),
       listPendingItemsForStores(storeIds),
+      getOpsAutoData(date),
     ]);
+    setOps(opsData);
 
     setTarget(t);
     setTargetInput(t > 0 ? String(t) : "");
@@ -100,12 +109,21 @@ export default function ReportHarianPanel() {
 
     if (rep) {
       setReport(rep);
-      setChatCount(rep.chat_count > 0 ? String(rep.chat_count) : "");
-      setUploadCount(rep.upload_count > 0 ? String(rep.upload_count) : "");
+      const str = (v: number | null | undefined) => (v && v > 0 ? String(v) : "");
+      setChatCount(str(rep.chat_count));
+      setLiveRevenue(str(rep.live_revenue));
+      setUnitLaptop(str(rep.unit_laptop));
+      setUnitAksesoris(str(rep.unit_aksesoris));
+      setVideoCount(str(rep.video_count));
+      setOpsUnboxing(str(rep.ops_unboxing_retur));
+      setOpsService(str(rep.ops_service_count));
+      setOpsCases(rep.ops_cases ?? "");
       setLossItems(rep.loss_notes ? rep.loss_notes.split("\n").filter(Boolean).map((l) => l.replace(/^\d+\.\s*/, "")) : []);
     } else {
       setReport(null);
-      setChatCount(""); setUploadCount(""); setLossItems([]);
+      setChatCount(""); setLossItems([]);
+      setLiveRevenue(""); setUnitLaptop(""); setUnitAksesoris(""); setVideoCount("");
+      setOpsUnboxing(""); setOpsService(""); setOpsCases("");
     }
     setLoadingAuto(false);
   }, [picName, date, stores]);
@@ -116,8 +134,9 @@ export default function ReportHarianPanel() {
     if (!picName || !date) return;
     setLoadingAuto(true);
     const storeIds = stores.filter((s) => s.pic_name === picName).map((s) => s.id);
-    const auto = await getAutoReportDataForStores(storeIds, date);
+    const [auto, opsData] = await Promise.all([getAutoReportDataForStores(storeIds, date), getOpsAutoData(date)]);
     setAutoData(auto);
+    setOps(opsData);
     setLoadingAuto(false);
   }
 
@@ -142,16 +161,27 @@ export default function ReportHarianPanel() {
         revenue_today: autoData.revenue_today,
         revenue_total: autoData.revenue_total,
         revenue_estimate: autoData.revenue_estimate,
-        chat_count: parseInt(chatCount) || 0,
-        upload_count: parseInt(uploadCount) || 0,
+        chat_count: num(chatCount),
         kombo_non_garansi: autoData.kombo_non_garansi,
         kombo_garansi: autoData.kombo_garansi,
         loss_notes: lossText || null,
+        live_revenue: num(liveRevenue),
+        unit_laptop: num(unitLaptop),
+        unit_aksesoris: num(unitAksesoris),
+        video_count: num(videoCount),
+        ops_unboxing_retur: num(opsUnboxing),
+        ops_service_count: num(opsService),
+        ops_cases: opsCases.trim() || null,
       },
       profile?.id ?? null
     );
     setSaving(false);
-    if (err) { setError(err); return; }
+    if (err) {
+      setError(/column|schema cache/i.test(err)
+        ? "Database belum di-update untuk template report baru. Jalankan file supabase-report-template-v2.sql di Supabase SQL Editor dulu."
+        : err);
+      return;
+    }
     const rep = await getDailyReport(primaryStoreId, date);
     setReport(rep);
     setSaved(true);
@@ -210,18 +240,16 @@ export default function ReportHarianPanel() {
       setError("Simpan report dulu sebelum generate WA.");
       return;
     }
-    const text = buildPicWaMessage(
-      picName,
-      stores,
-      report,
-      autoData,
-      pendingItems,
-      target,
-      date,
-      parseInt(chatCount) || 0,
-      parseInt(uploadCount) || 0,
-      lossText,
-    );
+    const text = buildPicWaMessage(picName, stores, autoData, ops, openPendingCount, target, date, {
+      liveRevenue: num(liveRevenue),
+      unitLaptop: num(unitLaptop),
+      unitAksesoris: num(unitAksesoris),
+      videoCount: num(videoCount),
+      lossNotes: lossText,
+      opsUnboxingRetur: num(opsUnboxing),
+      opsServiceCount: num(opsService),
+      opsCases: opsCases.trim(),
+    });
     setWaText(text);
     setShowWa(true);
     setCopied(false);
@@ -232,6 +260,8 @@ export default function ReportHarianPanel() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  const openPendingCount = pendingItems.filter((p) => p.status === "pending").length;
 
   // WA link to first store's PIC number (same person, all stores)
   const picWa = picStores[0]?.pic_wa ?? null;
@@ -259,7 +289,7 @@ export default function ReportHarianPanel() {
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900">Report Harian</h1>
-            <p className="text-sm text-slate-500 mt-1">Revenue, deal & kombo hemat otomatis dari Multiwarehouse. Isi manual: chat & pending.</p>
+            <p className="text-sm text-slate-500 mt-1">Revenue, jumlah orderan & data operasional otomatis dari Multiwarehouse & Retur. Sisanya isi manual.</p>
           </div>
         </div>
 
@@ -350,6 +380,10 @@ export default function ReportHarianPanel() {
                 </div>
               )}
 
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <AutoCard label="Jumlah Orderan" value={String(autoData.order_count)} />
+                <AutoCard label="Pending belum SO" value={String(openPendingCount)} />
+              </div>
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <AutoCard label="Total Deal" value={`${autoData.deal_qty} unit`} />
                 <AutoCard label="Kombo Garansi" value={String(autoData.kombo_garansi)} />
@@ -379,17 +413,35 @@ export default function ReportHarianPanel() {
 
         {/* MANUAL: Chat + Upload */}
         <form onSubmit={handleSave}>
-          <SectionCard title="Aktivitas (isi manual)">
+          <SectionCard title="Tim Penjualan (isi manual)">
             <div className="grid grid-cols-2 gap-3">
-              <Labeled label="Chat Masuk">
+              <div className="col-span-2">
+                <Labeled label="Total Revenue dari Live (Rp)">
+                  <input type="number" min={0} value={liveRevenue}
+                    onChange={(e) => setLiveRevenue(e.target.value)} placeholder="0" className={INPUT} />
+                  {num(liveRevenue) > 0 && <p className="text-[11px] text-slate-400 mt-1 text-right">{formatIDR(num(liveRevenue))}</p>}
+                </Labeled>
+              </div>
+              <Labeled label="Total Unit Laptop">
+                <input type="number" min={0} value={unitLaptop}
+                  onChange={(e) => setUnitLaptop(e.target.value)} placeholder="0" className={INPUT} />
+              </Labeled>
+              <Labeled label="Total Unit Aksesoris">
+                <input type="number" min={0} value={unitAksesoris}
+                  onChange={(e) => setUnitAksesoris(e.target.value)} placeholder="0" className={INPUT} />
+              </Labeled>
+              <Labeled label="Jumlah Video yang di Upload">
+                <input type="number" min={0} value={videoCount}
+                  onChange={(e) => setVideoCount(e.target.value)} placeholder="0" className={INPUT} />
+              </Labeled>
+              <Labeled label="Chat Masuk (opsional, buat Monitoring Tren)">
                 <input type="number" min={0} value={chatCount}
                   onChange={(e) => setChatCount(e.target.value)} placeholder="0" className={INPUT} />
               </Labeled>
-              <Labeled label="Upload Produk">
-                <input type="number" min={0} value={uploadCount}
-                  onChange={(e) => setUploadCount(e.target.value)} placeholder="0" className={INPUT} />
-              </Labeled>
             </div>
+            {autoData && autoData.deal_qty > 0 && (
+              <p className="text-[11px] text-slate-400 mt-2">Patokan: total unit di orderan hari ini {autoData.deal_qty} unit (laptop + aksesoris).</p>
+            )}
           </SectionCard>
 
           <SectionCard title="Loss (isi manual)">
@@ -440,6 +492,33 @@ export default function ReportHarianPanel() {
               </button>
             </div>
             {lossItems.length === 0 && <p className="text-[11px] text-slate-400 mt-1.5">Kosongkan jika tidak ada loss.</p>}
+          </SectionCard>
+
+          <SectionCard title="Operasional">
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <OpsStat label="Order Hari ini" value={ops?.orders_today} />
+              <OpsStat label="Pesanan Terkirim" value={ops?.orders_shipped} />
+              <OpsStat label="Pesanan Pending" value={ops?.orders_pending} />
+              <OpsStat label="Retur Masuk" value={ops?.retur_today} />
+              <OpsStat label="Retur belum Diproses" value={ops?.retur_unprocessed} />
+            </div>
+            <p className="text-[11px] text-slate-400 mb-3">Angka di atas otomatis (semua toko): terkirim = status Done di Orderan, retur dari menu Retur &amp; Gagal Kirim.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Labeled label="Total Unboxing Video Retur">
+                <input type="number" min={0} value={opsUnboxing}
+                  onChange={(e) => setOpsUnboxing(e.target.value)} placeholder="0" className={INPUT} />
+              </Labeled>
+              <Labeled label="Total Barang Service">
+                <input type="number" min={0} value={opsService}
+                  onChange={(e) => setOpsService(e.target.value)} placeholder="0" className={INPUT} />
+              </Labeled>
+              <div className="col-span-2">
+                <Labeled label="Case Operasional yang Muncul (satu case per baris)">
+                  <textarea value={opsCases} onChange={(e) => setOpsCases(e.target.value)} rows={3}
+                    placeholder="Kosongkan jika tidak ada case" className={INPUT + " resize-y"} />
+                </Labeled>
+              </div>
+            </div>
           </SectionCard>
 
           <button type="submit" disabled={saving || !autoData}
@@ -568,4 +647,17 @@ function AutoCard({ label, value }: { label: string; value: string }) {
       <p className="text-sm font-bold text-white leading-tight">{value}</p>
     </div>
   );
+}
+
+function OpsStat({ label, value }: { label: string; value: number | undefined }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
+      <p className="text-[11px] text-slate-500 mb-0.5">{label}</p>
+      <p className="text-base font-bold text-slate-900">{value ?? "…"}</p>
+    </div>
+  );
+}
+
+function num(v: string): number {
+  return parseInt(v.replace(/\D/g, ""), 10) || 0;
 }
