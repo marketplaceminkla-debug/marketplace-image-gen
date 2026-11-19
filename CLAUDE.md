@@ -20,7 +20,7 @@ right away. For ANY request (optimization, new feature, bug fix, etc.):
 3. Commit and push the development branch.
 4. **Deploy live**: fast-forward `main` to the change and push `main`. Vercel is
    connected to this repo and auto-deploys `main` to production
-   (https://marketplace-image-gen.vercel.app).
+   (https://pixelseller.my.id).
 5. Tell the owner it's live and roughly when to check.
 
 Do NOT wait for extra confirmation before deploying — auto-deploy is pre-authorized
@@ -29,9 +29,15 @@ break the live site, e.g. DB schema changes, deleting data, large refactors.)
 
 ## Infrastructure
 
-- **GitHub**: Claude has write access (GitHub App installed). git push works.
-- **Vercel**: connected via Git integration; `main` = production. Push to `main`
-  auto-deploys. Env vars (Supabase keys) are set in Vercel, not in this sandbox.
+- **GitHub**: main repo is `apriliahildar-sketch/marketplace-image-gen` (remote
+  `origin`, owned by Aprilia since Nov 2026). The old team repo
+  `marketplaceminkla-debug/marketplace-image-gen` (remote `team`) fed the old
+  Vercel project in ex-staffer Alfin's account — no longer the source of truth.
+- **Vercel**: project `marketplace-image-gen` in Aprilia's team `marketplace-kla`
+  (Hobby), connected via Git integration to `origin`; `main` = production.
+  Push to `main` auto-deploys. Domain pixelseller.my.id (DNS at Rumahweb).
+  Env vars (Supabase URL/keys, CRON_SECRET, STORAGE_LIMIT_BYTES) live in Vercel.
+- **Supabase project**: `quayxqrifysgymfntmfj` (Pro plan).
 - **Supabase**: storage bucket `product-photos` (public) for Shopee image URLs;
   schema in `supabase-setup.sql`. No direct dashboard/CLI access from here — for DB
   changes, prepare SQL and hand the owner exact steps to run in the Supabase SQL Editor.
