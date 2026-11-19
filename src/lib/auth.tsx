@@ -24,24 +24,33 @@ interface AuthContextValue {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null; needsConfirm: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** Why the last profile load failed (shown on the pending screen for diagnosis). */
+  profileError: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
-  if (error || !data) return null;
-  return data as Profile;
+async function fetchProfile(userId: string): Promise<{ profile: Profile | null; error: string | null }> {
+  try {
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
+    if (error || !data) return { profile: null, error: error?.message || "Profil tidak ditemukan." };
+    return { profile: data as Profile, error: null };
+  } catch (e) {
+    return { profile: null, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadProfile = useCallback(async (s: Session | null) => {
     if (s?.user) {
-      setProfile(await fetchProfile(s.user.id));
+      const res = await fetchProfile(s.user.id);
+      setProfile(res.profile);
+      setProfileError(res.error);
     } else {
       setProfile(null);
     }
@@ -106,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile, session]);
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile, profileError }}>
       {children}
     </AuthContext.Provider>
   );

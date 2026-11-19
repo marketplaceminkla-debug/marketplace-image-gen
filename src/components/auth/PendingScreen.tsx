@@ -1,16 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, LogOut, RefreshCw, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 export default function PendingScreen({ reason }: { reason: "pending" | "no-access" }) {
-  const { session, profile, signOut, refreshProfile } = useAuth();
+  const { session, profile, signOut, refreshProfile, profileError } = useAuth();
   const [retrying, setRetrying] = useState(false);
   // Signed in but no profile row came back: usually a network problem on this
   // device, not an unapproved account — say so instead of "menunggu persetujuan".
   const loadFailed = reason === "pending" && !profile;
   const email = profile?.email || session?.user?.email;
+
+  // A wrong laptop clock breaks login tokens. Compare with the server's clock
+  // (Date header of our own site) and warn when they're more than 2 minutes apart.
+  const [clockSkewMin, setClockSkewMin] = useState<number | null>(null);
+  useEffect(() => {
+    if (!loadFailed) return;
+    fetch(`/?t=${Date.now()}`, { method: "HEAD", cache: "no-store" })
+      .then((r) => {
+        const server = Date.parse(r.headers.get("date") || "");
+        if (!Number.isNaN(server)) setClockSkewMin(Math.round((Date.now() - server) / 60000));
+      })
+      .catch(() => {});
+  }, [loadFailed]);
+  const clockWrong = clockSkewMin !== null && Math.abs(clockSkewMin) > 2;
 
   async function retry() {
     setRetrying(true);
@@ -35,6 +49,14 @@ export default function PendingScreen({ reason }: { reason: "pending" | "no-acce
         </p>
         {email && (
           <p className="text-xs text-slate-400 mt-3">Masuk sebagai {email}</p>
+        )}
+        {loadFailed && clockWrong && (
+          <p className="text-xs font-semibold text-danger bg-danger-light rounded-lg px-3 py-2 mt-3">
+            Jam laptop ini {clockSkewMin! > 0 ? "kecepetan" : "telat"} {Math.abs(clockSkewMin!)} menit. Benerin dulu: Settings → Time &amp; language → nyalakan &quot;Set time automatically&quot; → Sync now, lalu login ulang.
+          </p>
+        )}
+        {loadFailed && profileError && (
+          <p className="text-[11px] text-slate-400 mt-2 break-words">Detail: {profileError}</p>
         )}
         <div className="mt-6 flex items-center justify-center gap-2">
         <button
