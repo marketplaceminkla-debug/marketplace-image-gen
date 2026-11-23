@@ -85,11 +85,10 @@ export function storeReportLabel(s: StoreAccount): string {
 }
 
 // Fixed header wording per PIC (as dictated by the owner) — combines their
-// store names into one line, e.g. "Shopee GADGET KLIK & LENOVO" for Alfin.
+// store names into one line, e.g. "Shopee KLA Laptop + Lenovo" for Rona.
 const PIC_REPORT_HEADERS: Record<string, string> = {
-  Alfin: "Shopee GADGET KLIK & LENOVO",
-  Dina: "Shopee KLA Aksesoris & Tokped KLA",
-  Rona: "Shopee KLA",
+  Dina: "Shopee KLA Acc + Tiktok + Gadget Klik",
+  Rona: "Shopee KLA Laptop + Lenovo",
 };
 
 /** Header line for a PIC's combined WA report (store names, not the person's name). */

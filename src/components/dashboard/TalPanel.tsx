@@ -17,7 +17,7 @@ const CATEGORY = {
   lainnya:  { label: "Lainnya",  icon: Pin,       style: "bg-slate-100 text-slate-500 border-slate-200" },
 } as const;
 
-const PIC_LIST = ["Semua", "Rona", "Dina", "Alfin", "Mauren"] as const;
+const PIC_LIST = ["Semua", "Rona", "Dina", "Mauren"] as const;
 type PicFilter = (typeof PIC_LIST)[number];
 
 // ── Proof upload modal ──
@@ -302,7 +302,6 @@ export default function TalPanel() {
                 className="flex-1 min-w-[100px] px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:border-brand">
                 <option value="Rona">Rona</option>
                 <option value="Dina">Dina</option>
-                <option value="Alfin">Alfin</option>
                 <option value="Mauren">Mauren</option>
               </select>
               <select value={category} onChange={(e) => setCategory(e.target.value as TalCategory)}

@@ -3,7 +3,7 @@ import { fetchAllRows } from "./warehouse";
 
 export type KpiUnit = "number" | "percent" | "currency";
 export type KpiCategory = "proses" | "hasil";
-export const PIC_LIST = ["Rona", "Dina", "Alfin", "Mauren"] as const;
+export const PIC_LIST = ["Rona", "Dina", "Mauren"] as const;
 export type PicName = (typeof PIC_LIST)[number];
 
 export interface KpiIndicator {
